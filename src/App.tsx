@@ -1,28 +1,36 @@
-import { useEffect, useState } from "react";
-import { weakHash } from "./api/CryptoHelpers";
-import { SignalingClient } from "./api/MQTTSecureClient";
+import { useEffect, useRef } from "react";
+import { SignalingClient } from "./api/SignalingClient";
+import { getMyIP } from "./api/Networking";
+import { generateName } from "./api/NameHelper";
+
+const initialName = generateName();
+const initialEmojiKey = "🫠";
 
 export const App = () => {
-  const [value, setValue] = useState("");
-  const [result, setResult] = useState("");
+  const refIP = useRef<string | null>(null);
+  const refMQTT = useRef<SignalingClient | null>(null);
 
   useEffect(() => {
-    SignalingClient.getChannelName("127.0.0.1")
-      .then(console.log)
-      .catch(console.error);
-  }, []);
+    async function run() {
+      const ip = await getMyIP();
+      console.log("Found IP:", ip);
+      const mqtt = await SignalingClient.build(
+        ip,
+        initialName,
+        initialEmojiKey
+      );
+      console.log("Created signaling client");
+      refIP.current = ip;
+      refMQTT.current = mqtt;
+    }
 
-  const handleClick = () => {
-    weakHash(value)
-      .then(setResult)
-      .catch((err) => setResult("ERR: " + err.message));
-  };
+    run().catch(console.error);
+  }, []);
 
   return (
     <>
-      <input value={value} onChange={(e) => setValue(e.target.value)} />
-      <button onClick={handleClick}>Hash</button>
-      <p>{result}</p>
+      <p>{initialName}</p>
+      <p>{initialEmojiKey}</p>
     </>
   );
 };
