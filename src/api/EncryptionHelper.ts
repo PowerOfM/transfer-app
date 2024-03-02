@@ -19,7 +19,7 @@ export class EncryptionHelper {
     const encryptedBuffer = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       key,
-      encoder.encode(plainText)
+      encoder.encode(plainText),
     );
 
     const encryptedArray = new Uint8Array([
@@ -27,12 +27,12 @@ export class EncryptionHelper {
       ...salt,
       ...new Uint8Array(encryptedBuffer),
     ]);
-    return this.arrayBufferToBase64(encryptedArray);
+    return UInt8ToBase64.toBase64(encryptedArray);
   }
 
   public async decrypt(encryptedText: string): Promise<string> {
     const decoder = new TextDecoder();
-    const encryptedArray = this.base64ToArrayBuffer(encryptedText);
+    const encryptedArray = UInt8ToBase64.toArray(encryptedText);
 
     const iv = encryptedArray.slice(0, IV_LEN);
     const salt = encryptedArray.slice(IV_LEN, SALT_LEN + IV_LEN);
@@ -41,7 +41,7 @@ export class EncryptionHelper {
     const decryptedBuffer = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv },
       key,
-      encryptedArray.slice(IV_LEN)
+      encryptedArray.slice(SALT_LEN + IV_LEN),
     );
 
     return decoder.decode(new Uint8Array(decryptedBuffer));
@@ -63,7 +63,7 @@ export class EncryptionHelper {
       encodedPasskey,
       { name: "PBKDF2" },
       false,
-      ["deriveBits", "deriveKey"]
+      ["deriveBits", "deriveKey"],
     );
 
     const key = await crypto.subtle.deriveKey(
@@ -76,32 +76,49 @@ export class EncryptionHelper {
       basekey,
       { name: "AES-GCM", length: 256 },
       true,
-      ["encrypt", "decrypt"]
+      ["encrypt", "decrypt"],
     );
     this.key = key;
     return key;
   }
 
-  private arrayBufferToBase64(buffer: Uint8Array): string {
-    return btoa(String.fromCharCode(...buffer));
-  }
+  // private arrayBufferToBase64(buffer: Uint8Array): string {
+  //   return new TextDecoder(buffer).encode("b64");
+  //   // return btoa(String.fromCharCode(...buffer));
+  // }
 
-  private base64ToArrayBuffer(base64: string): Uint8Array {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
+  // private base64ToArrayBuffer(base64: string): Uint8Array {
+  //   const binaryString = atob(new TextDecoder("utf8").decode(base64));
+  //   const len = binaryString.length;
+  //   const bytes = new Uint8Array(len);
 
-    for (let i = 0; i < len; ++i) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
+  //   for (let i = 0; i < len; ++i) {
+  //     bytes[i] = binaryString.charCodeAt(i);
+  //   }
 
-    return bytes;
-  }
+  //   return bytes;
+  // }
 
   public static async build(ip: string, emojiKey: string) {
     const hashIp = await weakHash(ip);
     const passkey = PASSKEY_PREFIX + hashIp + emojiKey;
 
     return new EncryptionHelper(passkey);
+  }
+}
+
+class UInt8ToBase64 {
+  public static toBase64(array: Uint8Array) {
+    const output: string[] = [];
+
+    for (let i = 0, length = array.length; i < length; i++) {
+      output.push(String.fromCharCode(array[i]));
+    }
+
+    return btoa(output.join(""));
+  }
+
+  public static toArray(chars: string) {
+    return Uint8Array.from(atob(chars), (c) => c.charCodeAt(0));
   }
 }
