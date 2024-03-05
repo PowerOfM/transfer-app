@@ -39,13 +39,14 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
     private readonly encryptionHelper: EncryptionHelper,
     public readonly ip: string,
     public readonly channelName: string,
-    private name: string
+    private name: string,
   ) {
     super();
 
     client.on("message", (_topic, payload) => {
-      console.log("[SIGNAL]", _topic, payload);
-      this.handlePayload(payload.toString()).catch((error) => {
+      const data = payload.toString();
+      console.log("[SIGNAL] Received", _topic, data);
+      this.handlePayload(data).catch((error) => {
         // TODO: handle error
         console.error("[SIGNAL] Handling error", error);
       });
@@ -70,13 +71,13 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
   public async send(
     type: SignalingPacketType,
     data1: unknown,
-    data2?: unknown
+    data2?: unknown,
   ) {
     const jsonStr = JSON.stringify([data1, data2].filter((i) => !!i));
-    console.log("[SIGNAL] Sending", type, jsonStr);
 
     const cypher = await this.encryptionHelper.encrypt(jsonStr);
     const payload = this.id + type + cypher;
+    console.log("[SIGNAL] Sending", payload);
     return this.client.publishAsync(this.channelName, payload);
   }
 
@@ -91,7 +92,7 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
     }
 
     const jsonStr = await this.encryptionHelper.decrypt(
-      payload.slice(ID_LEN + 2)
+      payload.slice(ID_LEN + 2),
     );
     const [data1, data2] = JSON.parse(jsonStr) as SignalingPacket;
     console.log("[SIGNAL] Received", id, type, data1, data2);
@@ -109,7 +110,7 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
   private handleUserUpdate(
     type: SignalingPacketType.Hello | SignalingPacketType.Welcome,
     id?: string,
-    name?: string
+    name?: string,
   ) {
     if (!id || !name) {
       console.error("Received invalid user update", { type, id, name });
@@ -148,7 +149,7 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
     ip: string,
     username: string,
     emojiKey: string,
-    brokerUrl: string = DEFAULT_BROKER
+    brokerUrl: string = DEFAULT_BROKER,
   ) {
     const channelName = await this.getChannelName(ip);
     const mqttCrypto = await EncryptionHelper.build(ip, emojiKey);
@@ -161,7 +162,7 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
       mqttCrypto,
       ip,
       channelName,
-      username
+      username,
     );
     await signalingClient.announce();
 

@@ -82,22 +82,9 @@ export class EncryptionHelper {
     return key;
   }
 
-  // private arrayBufferToBase64(buffer: Uint8Array): string {
-  //   return new TextDecoder(buffer).encode("b64");
-  //   // return btoa(String.fromCharCode(...buffer));
-  // }
-
-  // private base64ToArrayBuffer(base64: string): Uint8Array {
-  //   const binaryString = atob(new TextDecoder("utf8").decode(base64));
-  //   const len = binaryString.length;
-  //   const bytes = new Uint8Array(len);
-
-  //   for (let i = 0; i < len; ++i) {
-  //     bytes[i] = binaryString.charCodeAt(i);
-  //   }
-
-  //   return bytes;
-  // }
+  public clearSalt() {
+    this.salt = undefined;
+  }
 
   public static async build(ip: string, emojiKey: string) {
     const hashIp = await weakHash(ip);
