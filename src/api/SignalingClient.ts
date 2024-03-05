@@ -1,7 +1,5 @@
-import mqtt from "mqtt";
-import { EventEmitter } from "./EventEmitter";
-import { weakHash } from "./CryptoHelpers";
-import { EncryptionHelper } from "./EncryptionHelper";
+import { EventEmitter } from "typed-event-emitter";
+import { EncryptedMQTTClient } from "./EncryptedMQTTClient";
 
 enum SignalingPacketType {
   Hello = "!",
@@ -19,38 +17,25 @@ interface ISignalingUser {
   ts: number;
 }
 
-type SignalingClientEvents = "data" | "users";
-
-const ID_LEN = 32;
-const DEFAULT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
-const CHANNEL_NAME_PREFIX = "ARDP";
 const SIGNALING_PACKET_TYPES = [
   SignalingPacketType.Hello,
   SignalingPacketType.Welcome,
   SignalingPacketType.Data,
 ];
 
-export class SignalingClient extends EventEmitter<SignalingClientEvents> {
-  private id = this.createId();
+export class SignalingClient<T> extends EventEmitter {
+  public onData = this.registerEvent<[string, T]>();
+  public onUsers = this.registerEvent<[ISignalingUser[]]>();
+
   private users: ISignalingUser[] = [];
 
   constructor(
-    private readonly client: mqtt.MqttClient,
-    private readonly encryptionHelper: EncryptionHelper,
-    public readonly ip: string,
-    public readonly channelName: string,
-    private name: string,
+    private readonly client: EncryptedMQTTClient,
+    private name: string
   ) {
     super();
 
-    client.on("message", (_topic, payload) => {
-      const data = payload.toString();
-      console.log("[SIGNAL] Received", _topic, data);
-      this.handlePayload(data).catch((error) => {
-        // TODO: handle error
-        console.error("[SIGNAL] Handling error", error);
-      });
-    });
+    client.onData(this.handleData);
     // TODO: handle errors
     // TODO: handle disconnect
   }
@@ -71,46 +56,36 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
   public async send(
     type: SignalingPacketType,
     data1: unknown,
-    data2?: unknown,
+    data2?: unknown
   ) {
-    const jsonStr = JSON.stringify([data1, data2].filter((i) => !!i));
+    const output = [data1];
+    if (data2) output.push(data2);
+    const jsonStr = JSON.stringify(output);
 
-    const cypher = await this.encryptionHelper.encrypt(jsonStr);
-    const payload = this.id + type + cypher;
-    console.log("[SIGNAL] Sending", payload);
-    return this.client.publishAsync(this.channelName, payload);
+    await this.client.send(type + jsonStr);
   }
 
-  private async handlePayload(payload: string) {
-    const id = payload.slice(0, ID_LEN);
-    if (id === this.id) return;
-
-    const type = payload[ID_LEN] as SignalingPacketType;
+  private handleData = (fromId: string, data: string) => {
+    const [type, data1, data2] = JSON.parse(data) as SignalingPacket;
     if (!SIGNALING_PACKET_TYPES.includes(type)) {
       console.error("[SIGNAL] Invalid packet type", type);
       return;
     }
 
-    const jsonStr = await this.encryptionHelper.decrypt(
-      payload.slice(ID_LEN + 2),
-    );
-    const [data1, data2] = JSON.parse(jsonStr) as SignalingPacket;
-    console.log("[SIGNAL] Received", id, type, data1, data2);
-
     if (
       type === SignalingPacketType.Hello ||
       type === SignalingPacketType.Welcome
     ) {
-      this.handleUserUpdate(type, id, data1);
+      this.handleUserUpdate(type, fromId, data1);
     } else if (type === SignalingPacketType.Data) {
-      this.handleDataUpdate(id, data1, data2);
+      this.handleDataUpdate(fromId, data1, data2);
     }
-  }
+  };
 
   private handleUserUpdate(
     type: SignalingPacketType.Hello | SignalingPacketType.Welcome,
     id?: string,
-    name?: string,
+    name?: string
   ) {
     if (!id || !name) {
       console.error("Received invalid user update", { type, id, name });
@@ -129,7 +104,7 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
       this.send(SignalingPacketType.Welcome, this.name);
     }
 
-    this.emit("users", this.users);
+    this.emit(this.onUsers, this.users);
   }
 
   private handleDataUpdate(fromId?: string, toId?: string, data?: unknown) {
@@ -137,46 +112,16 @@ export class SignalingClient extends EventEmitter<SignalingClientEvents> {
       console.error("Received invalid data", { fromId, toId, data });
       return;
     }
-    if (toId !== this.id) return;
-    this.emit("data", { from: fromId, data });
+    if (toId !== this.client.id) return;
+    this.emit(this.onData, fromId, data as T);
   }
 
-  private createId() {
-    return crypto.randomUUID().replace(/-/g, "");
-  }
+  public static async build(ip: string, username: string, emojiKey: string) {
+    const client = await EncryptedMQTTClient.build(ip, emojiKey);
 
-  public static async build(
-    ip: string,
-    username: string,
-    emojiKey: string,
-    brokerUrl: string = DEFAULT_BROKER,
-  ) {
-    const channelName = await this.getChannelName(ip);
-    const mqttCrypto = await EncryptionHelper.build(ip, emojiKey);
-
-    const client = await mqtt.connectAsync(brokerUrl);
-    await client.subscribeAsync(channelName);
-
-    const signalingClient = new SignalingClient(
-      client,
-      mqttCrypto,
-      ip,
-      channelName,
-      username,
-    );
+    const signalingClient = new SignalingClient(client, username);
     await signalingClient.announce();
 
     return signalingClient;
-  }
-
-  public static async getChannelName(ip: string) {
-    const date = new Date();
-    const dateStr =
-      date.getFullYear().toString().slice(2) +
-      date.getMonth().toString() +
-      date.getDate();
-
-    const hashed = await weakHash(ip + dateStr);
-    return CHANNEL_NAME_PREFIX + hashed;
   }
 }
