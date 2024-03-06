@@ -12,7 +12,7 @@ export const getMyIP = async (): Promise<string> => {
     resolve = callback;
   });
 
-  // TODO:
+  // Track IP candidates
   const foundIPs: { v4?: string; v6?: string } = {};
   let timeout: number = 0;
   const onIp = (ip: string) => {
@@ -20,6 +20,7 @@ export const getMyIP = async (): Promise<string> => {
     if (isIPv6) foundIPs.v6 = ip;
     else foundIPs.v4 = ip;
 
+    // Defer callback by 500 to wait for other candidates
     if (timeout) clearTimeout(timeout);
     timeout = window.setTimeout(() => {
       const ret = foundIPs.v6 ?? foundIPs.v4;
@@ -42,7 +43,6 @@ export const getMyIP = async (): Promise<string> => {
     if (!matchResult) return;
     for (const ip of matchResult) {
       if (ip === "0.0.0.0") continue;
-      console.log("found an ip", ip);
       onIp(ip);
     }
   };

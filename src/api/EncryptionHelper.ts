@@ -13,38 +13,38 @@ export class EncryptionHelper {
   public async encrypt(plainText: string): Promise<string> {
     const salt = this.getSalt();
     const key = this.key || (await this.createKey(salt));
-    const encoder = new TextEncoder();
 
     const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
-    const encryptedBuffer = await crypto.subtle.encrypt(
+    const cipherText = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       key,
-      encoder.encode(plainText),
+      new TextEncoder().encode(plainText),
     );
 
-    const encryptedArray = new Uint8Array([
+    const result = new Uint8Array([
       ...iv,
       ...salt,
-      ...new Uint8Array(encryptedBuffer),
+      ...new Uint8Array(cipherText),
     ]);
-    return UInt8ToBase64.toBase64(encryptedArray);
+    return UInt8Encoder.toString(result);
   }
 
-  public async decrypt(encryptedText: string): Promise<string> {
-    const decoder = new TextDecoder();
-    const encryptedArray = UInt8ToBase64.toArray(encryptedText);
+  public async decrypt(input: string): Promise<string> {
+    const inputArray = UInt8Encoder.toArray(input);
 
-    const iv = encryptedArray.slice(0, IV_LEN);
-    const salt = encryptedArray.slice(IV_LEN, SALT_LEN + IV_LEN);
-    const key = this.key || (await this.createKey(salt));
+    const iv = inputArray.slice(0, IV_LEN);
+    const salt = inputArray.slice(IV_LEN, SALT_LEN + IV_LEN);
+
+    const key =
+      this.key && this.checkSalt(salt) ? this.key : await this.createKey(salt);
 
     const decryptedBuffer = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv },
       key,
-      encryptedArray.slice(SALT_LEN + IV_LEN),
+      inputArray.slice(SALT_LEN + IV_LEN),
     );
 
-    return decoder.decode(new Uint8Array(decryptedBuffer));
+    return new TextDecoder().decode(new Uint8Array(decryptedBuffer));
   }
 
   private getSalt() {
@@ -52,6 +52,15 @@ export class EncryptionHelper {
     const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
     this.salt = salt;
     return salt;
+  }
+
+  private checkSalt(target: Uint8Array) {
+    const src = this.salt;
+    if (!src || target.length !== src.length) return false;
+    for (let i = 0; i < src.length; i++) {
+      if (src[i] !== target[i]) return false;
+    }
+    return true;
   }
 
   private async createKey(salt: Uint8Array): Promise<CryptoKey> {
@@ -78,12 +87,10 @@ export class EncryptionHelper {
       true,
       ["encrypt", "decrypt"],
     );
-    this.key = key;
-    return key;
-  }
 
-  public clearSalt() {
-    this.salt = undefined;
+    this.key = key;
+    this.salt = salt;
+    return key;
   }
 
   public static async build(ip: string, emojiKey: string) {
@@ -94,11 +101,12 @@ export class EncryptionHelper {
   }
 }
 
-class UInt8ToBase64 {
-  public static toBase64(array: Uint8Array) {
+export class UInt8Encoder {
+  public static toString(array: Uint8Array) {
     const output: string[] = [];
-
-    for (let i = 0, length = array.length; i < length; i++) {
+    const len = array.length;
+    for (let i = 0; i < len; i++) {
+      // output.push(array[i].toString(36).padStart(2, "0"));
       output.push(String.fromCharCode(array[i]));
     }
 
