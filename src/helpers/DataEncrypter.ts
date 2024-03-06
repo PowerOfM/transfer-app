@@ -1,10 +1,10 @@
-import { weakHash } from "./CryptoHelpers";
+import { hash } from "./hash";
 
 const PASSKEY_PREFIX = "Areodrop";
 const IV_LEN = 12;
 const SALT_LEN = 16;
 
-export class EncryptionHelper {
+export class DataEncrypter {
   private salt?: Uint8Array;
   private key?: CryptoKey;
 
@@ -94,10 +94,10 @@ export class EncryptionHelper {
   }
 
   public static async build(ip: string, emojiKey: string) {
-    const hashIp = await weakHash(ip);
+    const hashIp = await hash(ip);
     const passkey = PASSKEY_PREFIX + hashIp + emojiKey;
 
-    return new EncryptionHelper(passkey);
+    return new DataEncrypter(passkey);
   }
 }
 

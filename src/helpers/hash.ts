@@ -1,8 +1,4 @@
-export const weakHash = async (
-  data: string,
-  alg = "SHA-1",
-  outputRadix = 36
-) => {
+export const hash = async (data: string, alg = "SHA-1", outputRadix = 36) => {
   const encoded = new TextEncoder().encode(data);
   const hashBuffer = await crypto.subtle.digest(alg, encoded);
 

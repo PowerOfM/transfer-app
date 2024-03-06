@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { getMyIP } from "./api/Networking";
-import { generateName } from "./api/NameHelper";
-import { EncryptedMQTTClient } from "./api/EncryptedMQTTClient";
+import { discoverIp } from "./helpers/discoverIp";
+import { generateName } from "./helpers/generateName";
+import { EncryptedMQTTClient } from "./clients/EncryptedMQTTClient";
 
 const initialName = generateName();
 const initialEmojiKey = "🫠";
@@ -14,7 +14,7 @@ export const App = () => {
 
   useEffect(() => {
     async function run() {
-      const ip = await getMyIP();
+      const ip = await discoverIp();
       console.log("Found IP:", ip);
       const mqtt = await EncryptedMQTTClient.build(ip, initialEmojiKey);
       mqtt.onBroadcast((msg) => setMessages((prev) => [...prev, msg]));
@@ -36,7 +36,7 @@ export const App = () => {
 
     run().catch(console.error);
     return () => {
-      refMQTT.current?.end();
+      refMQTT.current?.destroy();
     };
   }, []);
 

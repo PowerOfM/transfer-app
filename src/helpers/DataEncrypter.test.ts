@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { EncryptionHelper, UInt8Encoder } from "./EncryptionHelper";
+import { DataEncrypter, UInt8Encoder } from "./DataEncrypter";
 
-describe(EncryptionHelper.name, () => {
+describe(DataEncrypter.name, () => {
   it("encrypts and decrypts", async () => {
     const passkey = "secret";
-    const enc = new EncryptionHelper(passkey);
+    const enc = new DataEncrypter(passkey);
     const actual = "This is a test string";
     const cipher = await enc.encrypt(actual);
 
-    const dec = new EncryptionHelper(passkey);
+    const dec = new DataEncrypter(passkey);
     const plaintext = await dec.decrypt(cipher);
 
     expect(plaintext).toBe(actual);
