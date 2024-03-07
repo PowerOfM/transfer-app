@@ -17,21 +17,51 @@ type BroadcastPacket =
   | [BroadcastType.Welcome, string, string]
   | [BroadcastType.Leave, string];
 
-interface ISignalingUser {
+export enum SignalingType {
+  Request = ">",
+  Response = "<",
+  Offer = "o",
+  Answer = "a",
+  Candidate = "c",
+}
+const SIGNALING_TYPES = [
+  SignalingType.Request,
+  SignalingType.Response,
+  SignalingType.Offer,
+  SignalingType.Answer,
+  SignalingType.Candidate,
+];
+type SignalingPacketRequest = [SignalingType.Request, string];
+type SignalingPacketResponse = [SignalingType.Response, string];
+type SignalingPacketOffer = [SignalingType.Offer, RTCSessionDescriptionInit];
+type SignalingPacketAnswer = [SignalingType.Answer, RTCSessionDescriptionInit];
+type SignalingPacketCandidate = [SignalingType.Candidate, RTCIceCandidate];
+type SignalingPacket =
+  | SignalingPacketRequest
+  | SignalingPacketResponse
+  | SignalingPacketOffer
+  | SignalingPacketAnswer
+  | SignalingPacketCandidate;
+
+export interface ISignalingUser {
   id: string;
   name: string;
   ts: number;
 }
 
-export class SignalingClient<T> extends EventEmitter {
-  public onData = this.registerEvent<[string, T]>();
+export class SignalingClient extends EventEmitter {
   public onUsers = this.registerEvent<[ISignalingUser[]]>();
+  public onRequest = this.registerEvent<[SignalingPacketRequest[1]]>();
+  public onResponse = this.registerEvent<[SignalingPacketResponse[1]]>();
+  public onOffer = this.registerEvent<[SignalingPacketOffer[1]]>();
+  public onAnswer = this.registerEvent<[SignalingPacketAnswer[1]]>();
+  public onCandidate = this.registerEvent<[SignalingPacketCandidate[1]]>();
 
   private users: ISignalingUser[] = [];
 
   constructor(
     private readonly client: EncryptedMQTTClient,
-    private name: string,
+    private name: string
   ) {
     super();
 
@@ -72,8 +102,12 @@ export class SignalingClient<T> extends EventEmitter {
   /**
    * Send data to a specific client
    */
-  public async sendData(to: string, data: unknown) {
-    this.send(data, to);
+  public async sendData(
+    to: string,
+    type: SignalingPacket[0],
+    data: SignalingPacket[1]
+  ) {
+    this.send([type, data], to);
   }
 
   private async send(data: unknown, to?: string) {
@@ -86,11 +120,11 @@ export class SignalingClient<T> extends EventEmitter {
 
     // Validate
     if (!BROADCAST_TYPES.includes(type)) {
-      console.error("[SIGNALING] Invalid broadcast type", type);
+      console.error("[SIGNAL] Invalid broadcast type", type);
       return;
     }
     if (!id || !name) {
-      console.error("[SIGNALING] Invalid user", { type, id, name });
+      console.error("[SIGNAL] Invalid user", { type, id, name });
       return;
     }
 
@@ -102,15 +136,37 @@ export class SignalingClient<T> extends EventEmitter {
   };
 
   private handleData = (data: string) => {
-    const [fromId, payload] = JSON.parse(data);
+    const [type, payload] = JSON.parse(data) as SignalingPacket;
 
     // Validate
-    if (!fromId || !payload) {
-      console.error("Received invalid data", data);
+    if (!SIGNALING_TYPES.includes(type)) {
+      console.error("[SIGNAL] Invalid signaling type", type);
+      return;
+    }
+    if (!payload) {
+      console.error("[SIGNAL] Received invalid data", data);
       return;
     }
 
-    this.emit(this.onData, fromId, data as T);
+    // Emit specific events
+    if (type === SignalingType.Request) {
+      console.log("[SIGNAL] Received Request");
+      this.emit(this.onRequest, payload);
+    } else if (type === SignalingType.Response) {
+      console.log("[SIGNAL] Received Response");
+      this.emit(this.onResponse, payload);
+    } else if (type === SignalingType.Offer) {
+      console.log("[SIGNAL] Received Offer");
+      this.emit(this.onOffer, payload);
+    } else if (type === SignalingType.Answer) {
+      console.log("[SIGNAL] Received Answer");
+      this.emit(this.onAnswer, payload);
+    } else if (type === SignalingType.Candidate) {
+      console.log("[SIGNAL] Received Candidate");
+      this.emit(this.onCandidate, payload);
+    } else {
+      console.error("[SIGNAL] Invalid type", type);
+    }
   };
 
   private updateUsers(id: string, name: string, hasLeft: boolean) {

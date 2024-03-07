@@ -5,7 +5,7 @@ const NOOP = (_value: unknown) => {};
 /**
  * Get the user IP throught the webkitRTCPeerConnection
  */
-export const getMyIP = async (): Promise<string> => {
+export const discoverIp = async (): Promise<string> => {
   // Defer callback
   let resolve: (str: string) => void = NOOP;
   const p = new Promise<string>((callback) => {
