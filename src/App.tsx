@@ -1,68 +1,102 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import {
+  ISignalingPeer,
+  SignalingClient,
+  SignalingType,
+} from "./clients/SignalingClient";
 import { discoverIp } from "./helpers/discoverIp";
 import { generateName } from "./helpers/generateName";
-import { EncryptedMQTTClient } from "./clients/EncryptedMQTTClient";
+import { useAsync } from "./helpers/useAsync";
+import { DeviceList } from "./components/DeviceList";
 
+const fallbackId = crypto.randomUUID();
 const initialName = generateName();
-const initialEmojiKey = "🫠";
 
-export const App = () => {
-  const refIP = useRef<string | null>(null);
-  const refMQTT = useRef<EncryptedMQTTClient | null>(null);
-  const [messages, setMessages] = useState<string[]>([]);
-  const [value, setValue] = useState("");
+interface IProps {
+  ip: string;
+}
 
-  useEffect(() => {
-    async function run() {
-      const ip = await discoverIp();
-      console.log("Found IP:", ip);
-      const mqtt = await EncryptedMQTTClient.build(ip, initialEmojiKey);
-      mqtt.onBroadcast((msg) => setMessages((prev) => [...prev, msg]));
-      mqtt.onError((err) => {
-        console.error("MQTT ", err);
-        setMessages((prev) => [...prev, "ERR: " + err.message]);
+const AppInner = ({ ip }: IProps) => {
+  const [emoji] = useState<string>("🫠");
+  const [peers, setPeers] = useState<ISignalingPeer[]>([]);
+  const refPeer = useRef<string | null>(null);
+
+  const [signalingClient, loading, error] = useAsync(
+    async () => {
+      if (!ip) return null;
+      setPeers([]);
+
+      const client = await SignalingClient.build(ip, initialName, emoji);
+      client.onRequest((peerId) => {
+        if (refPeer.current) {
+          console.error(
+            "Already trying to establish peering. Rejected:",
+            peerId
+          );
+          return;
+        }
+
+        refPeer.current = peerId;
+
+        // TODO: start connection
+        client.sendData(peerId, SignalingType.Response, client.id);
       });
-      mqtt.onDecryptError((err) => {
-        console.error("MQTT ENC ", err);
-        setMessages((prev) => [...prev, "ERR ENC: " + err.message]);
+      client.onResponse((peerId) => {
+        if (peerId !== refPeer.current) {
+          console.error("Got response from someone else:", peerId);
+          return;
+        }
+        // TODO: start connection
       });
-      mqtt.onDisconnect(() =>
-        setMessages((prev) => [...prev, "< DISCONNECTED >"]),
-      );
-      console.log("Created mqrr client");
-      refIP.current = ip;
-      refMQTT.current = mqtt;
+      client.onPeers(setPeers);
+      return client;
+    },
+    [ip, emoji],
+    (client) => client && client.destroy()
+  );
+
+  if (loading) return "Loading...";
+  if (error || !signalingClient) return <div>Error! {error?.message}</div>;
+
+  const autoDiscoveryEnabled = ip !== fallbackId;
+  const handlePeerClick = (peer: ISignalingPeer) => {
+    if (refPeer.current) {
+      console.error("Already trying to establish peering. Can't peer to", peer);
+      return;
     }
 
-    run().catch(console.error);
-    return () => {
-      refMQTT.current?.destroy();
-    };
-  }, []);
-
-  const handleSend = (e: FormEvent) => {
-    e.preventDefault();
-    if (!value) return;
-    refMQTT.current?.send(value);
-    setValue("");
+    refPeer.current = peer.id;
+    signalingClient.sendData(
+      peer.id,
+      SignalingType.Request,
+      signalingClient.id
+    );
   };
 
   return (
-    <>
-      <p>{initialEmojiKey}</p>
-      <ul>
-        {messages.map((data, key) => (
-          <li key={key}>{data}</li>
-        ))}
-      </ul>
+    <div className="p-4">
+      <p>
+        <b>Proto:</b> <span className="text-secondary">MQTT</span>{" "}
+        <div className="kbd">{emoji}</div>
+      </p>
+      {autoDiscoveryEnabled && <p>Auto-discovery not available</p>}
 
-      <form onSubmit={handleSend}>
-        <label>
-          Message:{" "}
-          <input value={value} onChange={(e) => setValue(e.target.value)} />
-        </label>
-        <button type="submit">Send</button>
-      </form>
-    </>
+      <DeviceList
+        peers={peers}
+        ownId={signalingClient.id}
+        onClick={handlePeerClick}
+      />
+    </div>
   );
 };
+
+const LoadIp = () => {
+  const [ip, loading, error] = useAsync(() => discoverIp());
+
+  if (loading) return "Loading...";
+  if (error) return <div>Error! {error.message}</div>;
+
+  return <AppInner ip={ip ?? fallbackId} />;
+};
+
+export const App = LoadIp;

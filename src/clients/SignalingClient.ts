@@ -43,21 +43,25 @@ type SignalingPacket =
   | SignalingPacketAnswer
   | SignalingPacketCandidate;
 
-export interface ISignalingUser {
+export interface ISignalingPeer {
   id: string;
   name: string;
   ts: number;
 }
 
 export class SignalingClient extends EventEmitter {
-  public onUsers = this.registerEvent<[ISignalingUser[]]>();
+  public onPeers = this.registerEvent<[ISignalingPeer[]]>();
   public onRequest = this.registerEvent<[SignalingPacketRequest[1]]>();
   public onResponse = this.registerEvent<[SignalingPacketResponse[1]]>();
   public onOffer = this.registerEvent<[SignalingPacketOffer[1]]>();
   public onAnswer = this.registerEvent<[SignalingPacketAnswer[1]]>();
   public onCandidate = this.registerEvent<[SignalingPacketCandidate[1]]>();
 
-  private users: ISignalingUser[] = [];
+  private peers: ISignalingPeer[] = [];
+
+  public get id() {
+    return this.client.id;
+  }
 
   constructor(
     private readonly client: EncryptedMQTTClient,
@@ -83,6 +87,10 @@ export class SignalingClient extends EventEmitter {
   public setName(name: string) {
     this.name = name;
     this.sendWelcome();
+  }
+
+  public getPeers() {
+    return this.peers;
   }
 
   /**
@@ -124,15 +132,15 @@ export class SignalingClient extends EventEmitter {
       return;
     }
     if (!id || !name) {
-      console.error("[SIGNAL] Invalid user", { type, id, name });
+      console.error("[SIGNAL] Invalid peer", { type, id, name });
       return;
     }
 
     // Respond to "Hello" messages with a warm welcome
     if (type === BroadcastType.Hello) this.sendWelcome();
 
-    this.updateUsers(id, name, type === BroadcastType.Leave);
-    this.emit(this.onUsers, this.users);
+    this.updatePeers(id, name, type === BroadcastType.Leave);
+    this.emit(this.onPeers, this.peers);
   };
 
   private handleData = (data: string) => {
@@ -169,18 +177,18 @@ export class SignalingClient extends EventEmitter {
     }
   };
 
-  private updateUsers(id: string, name: string, hasLeft: boolean) {
-    const existingIndex = this.users.findIndex((entry) => entry.id === id);
+  private updatePeers(id: string, name: string, hasLeft: boolean) {
+    const existingIndex = this.peers.findIndex((entry) => entry.id === id);
     if (hasLeft) {
       if (existingIndex >= 0) {
-        this.users.splice(existingIndex, 1);
+        this.peers.splice(existingIndex, 1);
       }
     } else {
       if (existingIndex >= 0) {
-        this.users[existingIndex].name = name;
-        this.users[existingIndex].ts = Date.now();
+        this.peers[existingIndex].name = name;
+        this.peers[existingIndex].ts = Date.now();
       } else {
-        this.users.push({ id, name, ts: Date.now() });
+        this.peers.push({ id, name, ts: Date.now() });
       }
     }
   }
