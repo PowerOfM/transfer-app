@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { discoverIp } from "./helpers/discoverIp";
-import { generateName } from "./helpers/generateName";
-import { ISignalingPeer, SignalingClient } from "./clients/SignalingClient";
-import { useAsync } from "./helpers/useAsync";
+import { discoverIp } from "../helpers/discoverIp";
+import { generateName } from "../helpers/generateName";
+import { ISignalingPeer, SignalingClient } from "../clients/SignalingClient";
+import { useAsync } from "../helpers/useAsync";
 import clsx from "clsx";
-import { DeviceList } from "./components/DeviceList";
+import { DeviceList } from "../components/DeviceList";
 
 interface IProps {
   ip: string;
@@ -44,7 +44,7 @@ export const AppWithIP = ({ ip }: IProps) => {
     <div className="p-4">
       <p>
         <b>Proto:</b> <span className="text-secondary">MQTT</span>{" "}
-        <div className="kbd">{emoji}</div>
+        <span className="kbd">{emoji}</span>
       </p>
       {ip === fallbackId && <p>Auto-discovery not available</p>}
 

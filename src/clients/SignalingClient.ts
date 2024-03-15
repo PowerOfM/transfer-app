@@ -1,5 +1,6 @@
 import { EventEmitter } from "typed-event-emitter";
 import { EncryptedMQTTClient } from "./EncryptedMQTTClient";
+import { generateName } from "../helpers/generateName";
 
 enum BroadcastType {
   Hello = "!",
@@ -57,20 +58,17 @@ export class SignalingClient extends EventEmitter {
   public onAnswer = this.registerEvent<[SignalingPacketAnswer[1]]>();
   public onCandidate = this.registerEvent<[SignalingPacketCandidate[1]]>();
 
+  private client = new EncryptedMQTTClient();
   private peers: ISignalingPeer[] = [];
+  private name: string = generateName();
 
-  public get id() {
-    return this.client.id;
-  }
+  public readonly id = this.client.id;
 
-  constructor(
-    private readonly client: EncryptedMQTTClient,
-    private name: string
-  ) {
+  constructor() {
     super();
 
-    client.onBroadcast(this.handleBroadcast);
-    client.onData(this.handleData);
+    this.client.onBroadcast(this.handleBroadcast);
+    this.client.onData(this.handleData);
     // TODO: handle errors
     // TODO: handle disconnect
   }
@@ -91,6 +89,25 @@ export class SignalingClient extends EventEmitter {
 
   public getPeers() {
     return this.peers;
+  }
+
+  public async setRoom(roomId: string, passkey: string) {
+    if (!this.client.isConnected()) {
+      await this.client.connect();
+    }
+
+    const shouldSendHello = roomId !== this.client.getRoomId();
+    await this.client.setRoom(roomId, passkey);
+
+    if (shouldSendHello) {
+      await this.sendHello();
+    }
+
+    // TODO: schedule recurrence update (send welcomes)
+  }
+
+  public async leaveRoom() {
+    return this.client.leaveRoom();
   }
 
   /**
@@ -191,14 +208,5 @@ export class SignalingClient extends EventEmitter {
         this.peers.push({ id, name, ts: Date.now() });
       }
     }
-  }
-
-  public static async build(ip: string, username: string, emojiKey: string) {
-    const client = await EncryptedMQTTClient.build(ip, emojiKey);
-
-    const signalingClient = new SignalingClient(client, username);
-    await signalingClient.sendHello();
-
-    return signalingClient;
   }
 }

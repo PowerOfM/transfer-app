@@ -15,6 +15,7 @@ export const DeviceList = ({ peers, ownId, onClick }: IProps) => {
         const isYou = peer.id === ownId;
         return (
           <button
+            key={peer.id}
             disabled={isYou}
             className={clsx("btn btn-block", isYou && "btn-disabled")}
             onClick={() => onClick(peer)}

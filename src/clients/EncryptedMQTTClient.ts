@@ -14,15 +14,18 @@ export class EncryptedMQTTClient extends EventEmitter {
   public onDisconnect = this.registerEvent<[number]>();
 
   public readonly id = this.createId();
+  private readonly encrypter = new DataEncrypter();
 
-  constructor(
-    private readonly client: mqtt.MqttClient,
-    private readonly encypter: DataEncrypter,
-    public readonly ip: string,
-    public readonly channelName: string,
-  ) {
-    super();
+  private client: mqtt.MqttClient | undefined;
+  private roomId: string | undefined;
+  private channelName: string | undefined;
 
+  public async connect(brokerUrl = DEFAULT_BROKER) {
+    if (this.client) {
+      await this.destroy();
+    }
+
+    const client = await mqtt.connectAsync(brokerUrl);
     client.on("message", (topic, payload) => {
       this.handleMessage(topic, payload.toString());
     });
@@ -33,20 +36,75 @@ export class EncryptedMQTTClient extends EventEmitter {
       this.emit(this.onDisconnect, value.reasonCode);
     });
 
-    console.log("ID", this.id);
+    this.client = client;
+    console.log("connected!");
   }
 
-  private async init() {
-    this.client.subscribeAsync(this.channelName);
-    this.client.subscribeAsync(this.channelName + "_" + this.id);
+  public isConnected() {
+    return !!this.client;
+  }
+
+  public getChannelName() {
+    return this.channelName;
+  }
+
+  public getRoomId() {
+    return this.roomId;
+  }
+
+  public async setRoom(roomId: string, passkey: string) {
+    if (this.roomId !== roomId) {
+      this.roomId = roomId;
+      const newChannelName = await this.buildChannelName(roomId);
+      await this.subscribe(newChannelName);
+    }
+
+    await this.encrypter.buildPasskey(roomId, passkey);
+  }
+
+  public async leaveRoom() {
+    return this.unsubscribe();
+  }
+
+  public async subscribe(channelName: string) {
+    if (!this.client) {
+      throw new Error("Client not connected");
+    }
+
+    if (this.channelName === channelName) return;
+    if (this.channelName) {
+      await this.unsubscribe();
+    }
+
+    await this.client.subscribeAsync(channelName);
+    await this.client.subscribeAsync(channelName + "_" + this.id);
+    this.channelName = channelName;
+  }
+
+  public async unsubscribe() {
+    if (!this.channelName) return;
+
+    await this.client?.unsubscribeAsync(this.channelName);
+    await this.client?.unsubscribeAsync(this.channelName + "_" + this.id);
+    this.channelName = "";
   }
 
   public async destroy() {
-    return this.client.endAsync();
+    const client = this.client;
+    if (client) {
+      this.client = undefined;
+      await client.endAsync();
+    }
+
+    this.roomId = undefined;
+    this.channelName = undefined;
   }
 
   public async send(data: string, to?: string) {
-    const cypher = await this.encypter.encrypt(data);
+    if (!this.client || !this.channelName) {
+      throw new Error("Client not connected");
+    }
+    const cypher = await this.encrypter.encrypt(data);
 
     const payload = cypher;
     console.log("[MQTT] Sending", payload);
@@ -61,7 +119,7 @@ export class EncryptedMQTTClient extends EventEmitter {
 
     let data;
     try {
-      data = await this.encypter.decrypt(payload);
+      data = await this.encrypter.decrypt(payload);
     } catch (error) {
       this.emit(this.onDecryptError, error);
       console.error("[MQTT] Handling error", error);
@@ -76,34 +134,14 @@ export class EncryptedMQTTClient extends EventEmitter {
     return crypto.randomUUID().replace(/-/g, "");
   }
 
-  public static async build(
-    ip: string,
-    emojiKey: string,
-    brokerUrl: string = DEFAULT_BROKER,
-  ) {
-    const channelName = await this.getChannelName(ip);
-    const encryptionHelper = await DataEncrypter.build(ip, emojiKey);
-    const client = await mqtt.connectAsync(brokerUrl);
-
-    const signalingClient = new EncryptedMQTTClient(
-      client,
-      encryptionHelper,
-      ip,
-      channelName,
-    );
-    await signalingClient.init();
-
-    return signalingClient;
-  }
-
-  public static async getChannelName(ip: string) {
+  public async buildChannelName(roomId: string) {
     const date = new Date();
     const dateStr =
       String(date.getFullYear()).slice(2) +
       String(date.getMonth()) +
       date.getDate();
 
-    const hashed = await hash(ip + dateStr);
+    const hashed = await hash(roomId + dateStr);
     return CHANNEL_NAME_PREFIX + hashed;
   }
 }
