@@ -4,11 +4,15 @@ import { DataEncrypter, UInt8Encoder } from "./DataEncrypter";
 describe(DataEncrypter.name, () => {
   it("encrypts and decrypts", async () => {
     const passkey = "secret";
-    const enc = new DataEncrypter(passkey);
+    const suffix = "extraaa";
+
+    const enc = new DataEncrypter();
+    await enc.buildPasskey(passkey, suffix);
     const actual = "This is a test string";
     const cipher = await enc.encrypt(actual);
 
-    const dec = new DataEncrypter(passkey);
+    const dec = new DataEncrypter();
+    await dec.buildPasskey(passkey, suffix);
     const plaintext = await dec.decrypt(cipher);
 
     expect(plaintext).toBe(actual);

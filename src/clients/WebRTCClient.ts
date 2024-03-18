@@ -1,24 +1,20 @@
 import { EventEmitter } from "typed-event-emitter";
 import { SignalingClient, SignalingType } from "./SignalingClient";
 
-interface IPeer {
-  id: string;
-  name: string;
-}
-
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [{ urls: "stun:stun.1.google.com:19302" }],
 };
 
 export class WebRTCClient extends EventEmitter {
   public onConnected = this.registerEvent<[RTCDataChannel]>();
+  public readonly channels: RTCDataChannel[] = [];
 
   private connection: RTCPeerConnection;
 
   constructor(
-    public readonly peer: IPeer,
+    public readonly peerId: string,
     public readonly signalingClient: SignalingClient,
-    isInstigator = false
+    isInstigator = false,
   ) {
     super();
     signalingClient.onOffer(this.handlePeerOffer);
@@ -29,9 +25,9 @@ export class WebRTCClient extends EventEmitter {
     this.connection.onicecandidate = ({ candidate }) => {
       if (!candidate) return;
       this.signalingClient.sendData(
-        this.peer.id,
+        this.peerId,
         SignalingType.Candidate,
-        candidate
+        candidate,
       );
     };
     this.connection.ondatachannel = (event) => {
@@ -50,6 +46,11 @@ export class WebRTCClient extends EventEmitter {
     channel.onopen = () => {
       console.log("[RTC] Data channel is open and ready to be used.");
       this.emit(this.onConnected, channel);
+      this.channels.push(channel);
+    };
+    channel.onclose = () => {
+      const i = this.channels.indexOf(channel);
+      if (i >= 0) this.channels.splice(i, 1);
     };
     // channel.onmessage = ({ data }) => {
     //   this._handleChannelMessage(data);
@@ -69,9 +70,9 @@ export class WebRTCClient extends EventEmitter {
           return;
         }
         this.signalingClient.sendData(
-          this.peer.id,
+          this.peerId,
           SignalingType.Offer,
-          c.localDescription
+          c.localDescription,
         );
       })
       .catch((err: Error) => {
@@ -92,9 +93,9 @@ export class WebRTCClient extends EventEmitter {
         }
 
         this.signalingClient.sendData(
-          this.peer.id,
+          this.peerId,
           SignalingType.Answer,
-          c.localDescription
+          c.localDescription,
         );
       })
       .catch((err: Error) => {
