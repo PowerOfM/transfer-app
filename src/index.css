@@ -1,3 +1,30 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+:root {
+  --primary: #007fe0;
+  --pink: #ff4ce7;
+  --green: #4cffa0;
+  --grey: #00000066;
+  --black: #000000;
+  --white: #ffffff;
+
+  --radius: 10px;
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 15px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  padding: 15px;
+  max-width: 500px;
+  margin: 0 auto;
+}

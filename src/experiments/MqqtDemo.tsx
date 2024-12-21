@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { discoverIp } from "../helpers/discoverIp";
-import { generateName } from "../helpers/generateName";
-import { EncryptedMQTTClient } from "../clients/EncryptedMQTTClient";
+import { generateName } from "../helpers/RandomGenerator";
+import { EncryptedMQTTClient } from "../signaling/EncryptedMQTTClient";
 
 const initialName = generateName();
 const initialEmojiKey = "🫠";

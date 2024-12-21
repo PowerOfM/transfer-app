@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { DataEncrypter } from "../helpers/DataEncrypter";
+import { DataEncryptor } from "../helpers/DataEncrypter";
 
 export function EncDemo() {
   const [passkey, setPasskey] = useState("passkey");
@@ -7,7 +7,7 @@ export function EncDemo() {
   const [cipher, setCipher] = useState("");
 
   const enc = useMemo(() => {
-    return new DataEncrypter(passkey);
+    return new DataEncryptor(passkey);
   }, [passkey]);
 
   const doEnc = () => {

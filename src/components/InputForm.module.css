@@ -1,0 +1,31 @@
+.form {
+  position: relative;
+
+  input {
+    border: none;
+    padding: 10px;
+    border-radius: var(--radius);
+    box-shadow: 0 0 2px 0 rgba(0, 0, 0, 0.3);
+    padding-right: 60px;
+    width: 100%;
+    font-size: 16px;
+  }
+
+  button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0 10px;
+    border: none;
+    width: 60px;
+    height: auto;
+
+    &:disabled {
+      background: var(--grey);
+      cursor: not-allowed;
+    }
+  }
+}

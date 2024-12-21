@@ -1,0 +1,54 @@
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  h1 {
+    font-size: 15px;
+    font-weight: normal;
+    flex: 1;
+  }
+}
+
+.inputs {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+
+  .discovery {
+    flex: 1;
+  }
+
+  .emoji {
+    min-width: 60px;
+  }
+}
+
+.peer {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  padding: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  .dot {
+    display: block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+  }
+
+  &:hover {
+    color: var(--primary);
+    .dot {
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.3);
+    }
+  }
+
+  &.disabled {
+    color: var(--grey);
+    cursor: default;
+    pointer-events: none;
+  }
+}

@@ -1,0 +1,12 @@
+.connection {
+  height: 100vh;
+  justify-content: center;
+  align-items: center;
+
+  .visual {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+  }
+}

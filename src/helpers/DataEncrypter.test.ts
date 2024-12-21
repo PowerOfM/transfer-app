@@ -4,7 +4,7 @@ import { DataEncrypter, UInt8Encoder } from "./DataEncrypter";
 describe(DataEncrypter.name, () => {
   it("encrypts and decrypts", async () => {
     const passkey = "secret";
-    const suffix = "extraaa";
+    const suffix = "extra_a_a";
 
     const enc = new DataEncrypter();
     await enc.buildPasskey(passkey, suffix);

@@ -1,0 +1,30 @@
+.btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background-color: var(--primary);
+  color: var(--white);
+  border-radius: var(--radius);
+  height: 50px;
+  padding: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+
+  &:hover {
+    background-color: color-mix(in srgb, var(--primary), var(--white) 20%);
+  }
+
+  &:active {
+    background-color: color-mix(in srgb, var(--primary), var(--black) 30%);
+  }
+
+  &.leftIcon {
+    svg {
+      position: absolute;
+      left: 10px;
+    }
+  }
+}

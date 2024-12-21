@@ -1,6 +1,7 @@
 import { EventEmitter } from "typed-event-emitter";
+import { Logger } from "../helpers/Logger";
+import { RandomGenerator } from "../helpers/RandomGenerator";
 import { EncryptedMQTTClient } from "./EncryptedMQTTClient";
-import { generateName } from "../helpers/generateName";
 
 enum BroadcastType {
   Hello = "!",
@@ -50,6 +51,15 @@ export interface ISignalingPeer {
   ts: number;
 }
 
+export enum ErrorSource {
+  MQTTClient = "MQTTClient",
+  Signaling = "Signaling",
+}
+
+/**
+ * Signaling client that wraps an MQTT client to exchange messages with other peers.
+ * Defines a protocol for exchanging messages with other peers for discovery and WebRTC negotiation.
+ */
 export class SignalingClient extends EventEmitter {
   public onPeers = this.registerEvent<[ISignalingPeer[]]>();
   public onRequest = this.registerEvent<[SignalingPacketRequest[1]]>();
@@ -57,23 +67,29 @@ export class SignalingClient extends EventEmitter {
   public onOffer = this.registerEvent<[SignalingPacketOffer[1]]>();
   public onAnswer = this.registerEvent<[SignalingPacketAnswer[1]]>();
   public onCandidate = this.registerEvent<[SignalingPacketCandidate[1]]>();
+  public onError = this.registerEvent<[ErrorSource, Error]>();
 
+  private logger = new Logger("SignalingClient");
   private client = new EncryptedMQTTClient();
   private peers: ISignalingPeer[] = [];
-  private name: string = generateName();
+  private name: string = RandomGenerator.name();
 
   public readonly id = this.client.id;
 
   constructor() {
     super();
+    this.logger.debug("Instance created");
 
     this.client.onBroadcast(this.handleBroadcast);
     this.client.onData(this.handleData);
-    // TODO: handle errors
+    this.client.onError((error) =>
+      this.emit(this.onError, ErrorSource.MQTTClient, error)
+    );
     // TODO: handle disconnect
   }
 
   public async destroy() {
+    this.logger.debug("Ending client");
     await this.send([BroadcastType.Leave, this.client.id, this.name]);
     await this.client.destroy();
   }
@@ -91,19 +107,19 @@ export class SignalingClient extends EventEmitter {
     return this.peers;
   }
 
+  public async connect(brokerUrl?: string) {
+    await this.client.connect(brokerUrl);
+  }
+
   public async setRoom(roomId: string, passkey: string) {
     if (!this.client.isConnected()) {
       await this.client.connect();
     }
 
-    const shouldSendHello = roomId !== this.client.getRoomId();
     await this.client.setRoom(roomId, passkey);
-
-    if (shouldSendHello) {
-      await this.sendHello();
-    }
-
-    // TODO: schedule recurrence update (send welcomes)
+    await this.sendHello();
+    this.peers = [];
+    this.emit(this.onPeers, this.peers);
   }
 
   public async leaveRoom() {
@@ -145,11 +161,11 @@ export class SignalingClient extends EventEmitter {
 
     // Validate
     if (!BROADCAST_TYPES.includes(type)) {
-      console.error("[SIGNAL] Invalid broadcast type", type);
+      this.logger.error("Invalid broadcast type", type);
       return;
     }
     if (!id || !name) {
-      console.error("[SIGNAL] Invalid peer", { type, id, name });
+      this.logger.error("Invalid peer", { type, id, name });
       return;
     }
 
@@ -165,32 +181,32 @@ export class SignalingClient extends EventEmitter {
 
     // Validate
     if (!SIGNALING_TYPES.includes(type)) {
-      console.error("[SIGNAL] Invalid signaling type", type);
+      this.logger.error("Invalid signaling type", type);
       return;
     }
     if (!payload) {
-      console.error("[SIGNAL] Received invalid data", data);
+      this.logger.error("Received invalid data", data);
       return;
     }
 
     // Emit specific events
     if (type === SignalingType.Request) {
-      console.log("[SIGNAL] Received Request");
+      this.logger.debug("Received Request");
       this.emit(this.onRequest, payload);
     } else if (type === SignalingType.Response) {
-      console.log("[SIGNAL] Received Response");
+      this.logger.debug("Received Response");
       this.emit(this.onResponse, payload);
     } else if (type === SignalingType.Offer) {
-      console.log("[SIGNAL] Received Offer");
+      this.logger.debug("Received Offer");
       this.emit(this.onOffer, payload);
     } else if (type === SignalingType.Answer) {
-      console.log("[SIGNAL] Received Answer");
+      this.logger.debug("Received Answer");
       this.emit(this.onAnswer, payload);
     } else if (type === SignalingType.Candidate) {
-      console.log("[SIGNAL] Received Candidate");
+      this.logger.debug("Received Candidate");
       this.emit(this.onCandidate, payload);
     } else {
-      console.error("[SIGNAL] Invalid type", type);
+      this.logger.error("Invalid type", type);
     }
   };
 

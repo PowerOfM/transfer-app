@@ -1,31 +1,26 @@
-import { useState } from "react";
-import { discoverIp } from "./helpers/discoverIp";
-import { useAsync } from "./helpers/useAsync";
-import { SignalingPage } from "./pages/Signaling";
+import { useCallback, useState } from "react";
+import { PeeringPage } from "./peering/PeeringPage";
+import { IPeerConnection } from "./sharedTypes";
+import { SignalingPage } from "./signaling/SignalingPage";
 
-const fallbackId = crypto.randomUUID();
-
-enum AppStep {
-  Signaling,
-  Peering,
-}
+type AppStep = "signaling" | "peering";
 
 export const App = () => {
-  const [ip, loading, error] = useAsync(() => discoverIp());
-  const [step, setStep] = useState<AppStep>(AppStep.Signaling);
+  const [step, setStep] = useState<AppStep>("signaling");
+  const [peerConnection, setPeerConnection] = useState<IPeerConnection | null>(
+    null
+  );
 
-  if (loading) return "Loading...";
-  if (error) return <div>Error! {error.message}</div>;
+  const onSignalingReady = useCallback((result: IPeerConnection) => {
+    setPeerConnection(result);
+    setStep("peering");
+  }, []);
 
-  if (step === AppStep.Signaling) {
-    return (
-      <SignalingPage
-        ip={ip ?? fallbackId}
-        autoDiscoveryEnabled={!!ip}
-        onReady={() => setStep(AppStep.Peering)}
-      />
-    );
+  if (step === "signaling") {
+    return <SignalingPage onReady={onSignalingReady} />;
+  } else if (peerConnection) {
+    return <PeeringPage peerConnection={peerConnection} />;
   } else {
-    return <div>hi</div>;
+    return <div className="page">Error: Unexpected state</div>;
   }
 };

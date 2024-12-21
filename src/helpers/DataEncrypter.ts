@@ -1,6 +1,6 @@
 import { hash } from "./hash";
 
-const PASSKEY_PREFIX = "Areodrop";
+const PASSKEY_PREFIX = "AeroDrop";
 const IV_LEN = 12;
 const SALT_LEN = 16;
 
@@ -25,7 +25,7 @@ export class DataEncrypter {
     const cipherText = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       key,
-      new TextEncoder().encode(plainText),
+      new TextEncoder().encode(plainText)
     );
 
     const result = new Uint8Array([
@@ -48,7 +48,7 @@ export class DataEncrypter {
     const decryptedBuffer = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv },
       key,
-      inputArray.slice(SALT_LEN + IV_LEN),
+      inputArray.slice(SALT_LEN + IV_LEN)
     );
 
     return new TextDecoder().decode(new Uint8Array(decryptedBuffer));
@@ -79,7 +79,7 @@ export class DataEncrypter {
       encodedPasskey,
       { name: "PBKDF2" },
       false,
-      ["deriveBits", "deriveKey"],
+      ["deriveBits", "deriveKey"]
     );
 
     const key = await crypto.subtle.deriveKey(
@@ -92,7 +92,7 @@ export class DataEncrypter {
       basekey,
       { name: "AES-GCM", length: 256 },
       true,
-      ["encrypt", "decrypt"],
+      ["encrypt", "decrypt"]
     );
 
     this.key = key;

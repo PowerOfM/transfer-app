@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { discoverIp } from "../helpers/discoverIp";
-import { generateName } from "../helpers/generateName";
-import { ISignalingPeer, SignalingClient } from "../clients/SignalingClient";
-import { useAsync } from "../helpers/useAsync";
-import clsx from "clsx";
+import { useRef, useState } from "react";
 import { DeviceList } from "../components/DeviceList";
+import { discoverIp } from "../helpers/discoverIp";
+import { generateName } from "../helpers/RandomGenerator";
+import { useAsync } from "../helpers/useAsync";
+import { ISignalingPeer, SignalingClient } from "../signaling/SignalingClient";
 
 interface IProps {
   ip: string;
@@ -48,7 +47,11 @@ export const AppWithIP = ({ ip }: IProps) => {
       </p>
       {ip === fallbackId && <p>Auto-discovery not available</p>}
 
-      <DeviceList peers={peers} ownId={fallbackId} onClick={handleClick} />
+      <DeviceList
+        peers={peers}
+        localPeerId={fallbackId}
+        onClick={handleClick}
+      />
     </div>
   );
 };

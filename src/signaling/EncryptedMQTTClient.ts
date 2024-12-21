@@ -1,11 +1,18 @@
 import mqtt from "mqtt";
 import { EventEmitter } from "typed-event-emitter";
-import { hash } from "../helpers/hash";
 import { DataEncrypter } from "../helpers/DataEncrypter";
+import { hash } from "../helpers/hash";
+import { Logger } from "../helpers/Logger";
 
-const DEFAULT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+// const DEFAULT_BROKER = "wss://broker.hivemq.com:8884/mqtt";
+const DEFAULT_BROKER = "ws://localhost:8883";
 const CHANNEL_NAME_PREFIX = "ARDP";
 
+type ClientStatus = "disconnected" | "connecting" | "connected" | "error";
+
+/**
+ * MQTT client that encrypts and decrypts messages.
+ */
 export class EncryptedMQTTClient extends EventEmitter {
   public onData = this.registerEvent<[string]>();
   public onBroadcast = this.registerEvent<[string]>();
@@ -16,11 +23,37 @@ export class EncryptedMQTTClient extends EventEmitter {
   public readonly id = this.createId();
   private readonly encrypter = new DataEncrypter();
 
+  private DEBUG = true;
+  private logger = new Logger("MQTT");
   private client: mqtt.MqttClient | undefined;
   private roomId: string | undefined;
   private channelName: string | undefined;
 
+  private _status: ClientStatus = "disconnected";
+  public get status() {
+    return this._status;
+  }
+
+  private _brokerUrl: string | undefined;
+  public get brokerUrl() {
+    return this._brokerUrl;
+  }
+
+  private connectingPromise: Promise<void> | undefined;
+
   public async connect(brokerUrl = DEFAULT_BROKER) {
+    if (this.connectingPromise) return this.connectingPromise;
+
+    this.connectingPromise = this._connect(brokerUrl);
+    return this.connectingPromise;
+  }
+
+  private async _connect(brokerUrl = DEFAULT_BROKER) {
+    if (this.client && this._brokerUrl === brokerUrl) return;
+
+    this._brokerUrl = brokerUrl;
+    this.logger.debug("Connecting to broker", brokerUrl);
+
     if (this.client) {
       await this.destroy();
     }
@@ -31,17 +64,23 @@ export class EncryptedMQTTClient extends EventEmitter {
     });
     client.on("error", (error) => {
       this.emit(this.onError, error);
+      this._status = "error";
     });
     client.on("disconnect", (value) => {
       this.emit(this.onDisconnect, value.reasonCode);
+      this._status = "disconnected";
+    });
+    client.on("connect", () => {
+      this._status = "connected";
     });
 
     this.client = client;
-    console.log("connected!");
+    this.logger.debug("Connected!");
+    this.connectingPromise = undefined;
   }
 
   public isConnected() {
-    return !!this.client;
+    return this._status === "connected";
   }
 
   public getChannelName() {
@@ -107,7 +146,7 @@ export class EncryptedMQTTClient extends EventEmitter {
     const cypher = await this.encrypter.encrypt(data);
 
     const payload = cypher;
-    console.log("[MQTT] Sending", payload);
+    if (this.DEBUG) this.logger.debug("Sending", payload);
 
     let channel = this.channelName;
     if (to) channel += "_" + to;
@@ -115,14 +154,14 @@ export class EncryptedMQTTClient extends EventEmitter {
   }
 
   private async handleMessage(channel: string, payload: string) {
-    console.log("[MQTT] Received", payload);
+    if (this.DEBUG) this.logger.debug("Received", payload);
 
     let data;
     try {
       data = await this.encrypter.decrypt(payload);
     } catch (error) {
       this.emit(this.onDecryptError, error);
-      console.error("[MQTT] Handling error", error);
+      this.logger.error("Error decrypting message", error);
       return;
     }
 
