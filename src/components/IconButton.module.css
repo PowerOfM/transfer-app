@@ -1,0 +1,9 @@
+.iconButton {
+  padding: 15px;
+  cursor: pointer;
+  border-radius: var(--radius);
+
+  &:hover {
+    background: color-mix(in srgb, var(--primary), transparent 75%);
+  }
+}

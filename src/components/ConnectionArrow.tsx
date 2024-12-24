@@ -20,8 +20,8 @@ export const ConnectionArrow = () => (
         gradientUnits="userSpaceOnUse"
       >
         <stop stopColor="#FF4CE7" />
-        <stop offset="1" stop-color="#4CFFA0" />
+        <stop offset="1" stopColor="#4CFFA0" />
       </linearGradient>
     </defs>
   </svg>
-);
+)

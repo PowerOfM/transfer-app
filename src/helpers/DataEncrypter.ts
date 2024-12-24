@@ -1,78 +1,78 @@
-import { hash } from "./hash";
+import { hash } from "./hash"
 
-const PASSKEY_PREFIX = "AeroDrop";
-const IV_LEN = 12;
-const SALT_LEN = 16;
+const PASSKEY_PREFIX = "AeroDrop"
+const IV_LEN = 12
+const SALT_LEN = 16
 
 export class DataEncrypter {
-  private passkey: string = crypto.randomUUID();
-  private salt?: Uint8Array;
-  private key?: CryptoKey;
+  private passkey: string = crypto.randomUUID()
+  private salt?: Uint8Array
+  private key?: CryptoKey
 
   public async buildPasskey(key: string, suffix: string) {
-    const hashed = await hash(key);
-    this.passkey = PASSKEY_PREFIX + hashed + suffix;
+    const hashed = await hash(key)
+    this.passkey = PASSKEY_PREFIX + hashed + suffix
 
-    this.key = undefined;
-    this.salt = undefined;
+    this.key = undefined
+    this.salt = undefined
   }
 
   public async encrypt(plainText: string): Promise<string> {
-    const salt = this.getSalt();
-    const key = this.key || (await this.createKey(salt));
+    const salt = this.getSalt()
+    const key = this.key || (await this.createKey(salt))
 
-    const iv = crypto.getRandomValues(new Uint8Array(IV_LEN));
+    const iv = crypto.getRandomValues(new Uint8Array(IV_LEN))
     const cipherText = await crypto.subtle.encrypt(
       { name: "AES-GCM", iv },
       key,
       new TextEncoder().encode(plainText)
-    );
+    )
 
     const result = new Uint8Array([
       ...iv,
       ...salt,
       ...new Uint8Array(cipherText),
-    ]);
-    return UInt8Encoder.toString(result);
+    ])
+    return UInt8Encoder.toString(result)
   }
 
   public async decrypt(input: string): Promise<string> {
-    const inputArray = UInt8Encoder.toArray(input);
+    const inputArray = UInt8Encoder.toArray(input)
 
-    const iv = inputArray.slice(0, IV_LEN);
-    const salt = inputArray.slice(IV_LEN, SALT_LEN + IV_LEN);
+    const iv = inputArray.slice(0, IV_LEN)
+    const salt = inputArray.slice(IV_LEN, SALT_LEN + IV_LEN)
 
     const key =
-      this.key && this.checkSalt(salt) ? this.key : await this.createKey(salt);
+      this.key && this.checkSalt(salt) ? this.key : await this.createKey(salt)
 
     const decryptedBuffer = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv },
       key,
       inputArray.slice(SALT_LEN + IV_LEN)
-    );
+    )
 
-    return new TextDecoder().decode(new Uint8Array(decryptedBuffer));
+    return new TextDecoder().decode(new Uint8Array(decryptedBuffer))
   }
 
   private getSalt() {
-    if (this.salt) return this.salt;
-    const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
-    this.salt = salt;
-    return salt;
+    if (this.salt) return this.salt
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN))
+    this.salt = salt
+    return salt
   }
 
   private checkSalt(target: Uint8Array) {
-    const src = this.salt;
-    if (!src || target.length !== src.length) return false;
+    const src = this.salt
+    if (!src || target.length !== src.length) return false
     for (let i = 0; i < src.length; i++) {
-      if (src[i] !== target[i]) return false;
+      if (src[i] !== target[i]) return false
     }
-    return true;
+    return true
   }
 
   private async createKey(salt: Uint8Array): Promise<CryptoKey> {
-    const encoder = new TextEncoder();
-    const encodedPasskey = encoder.encode(this.passkey);
+    const encoder = new TextEncoder()
+    const encodedPasskey = encoder.encode(this.passkey)
 
     const basekey = await crypto.subtle.importKey(
       "raw",
@@ -80,7 +80,7 @@ export class DataEncrypter {
       { name: "PBKDF2" },
       false,
       ["deriveBits", "deriveKey"]
-    );
+    )
 
     const key = await crypto.subtle.deriveKey(
       {
@@ -93,27 +93,27 @@ export class DataEncrypter {
       { name: "AES-GCM", length: 256 },
       true,
       ["encrypt", "decrypt"]
-    );
+    )
 
-    this.key = key;
-    this.salt = salt;
-    return key;
+    this.key = key
+    this.salt = salt
+    return key
   }
 }
 
 export class UInt8Encoder {
   public static toString(array: Uint8Array) {
-    const output: string[] = [];
-    const len = array.length;
+    const output: string[] = []
+    const len = array.length
     for (let i = 0; i < len; i++) {
       // output.push(array[i].toString(36).padStart(2, "0"));
-      output.push(String.fromCharCode(array[i]));
+      output.push(String.fromCharCode(array[i]))
     }
 
-    return btoa(output.join(""));
+    return btoa(output.join(""))
   }
 
   public static toArray(chars: string) {
-    return Uint8Array.from(atob(chars), (c) => c.charCodeAt(0));
+    return Uint8Array.from(atob(chars), (c) => c.charCodeAt(0))
   }
 }

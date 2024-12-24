@@ -1,6 +1,6 @@
-import clsx from "clsx";
-import { ButtonHTMLAttributes } from "react";
-import cl from "./Button.module.css";
+import clsx from "clsx"
+import { ButtonHTMLAttributes } from "react"
+import cl from "./Button.module.css"
 
 type IProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   leftIcon?: boolean;
@@ -18,4 +18,4 @@ export const Button = ({
   >
     {children}
   </button>
-);
+)

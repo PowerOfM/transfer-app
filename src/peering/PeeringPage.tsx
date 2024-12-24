@@ -1,162 +1,153 @@
-import clsx from "clsx";
+import clsx from "clsx"
 import {
-  CopyIcon,
-  DownloadIcon,
   FileUpIcon,
-  ImageIcon,
   ImageUpIcon,
-  LucideIcon,
+  RefreshCcwIcon,
   UnplugIcon,
-} from "lucide-react";
-import { useEffect, useState } from "react";
-import { Badge } from "../components/Badge";
-import { Button } from "../components/Button";
-import { InputForm } from "../components/InputForm";
-import { Logger } from "../helpers/Logger";
-import { IPeerConnection } from "../sharedTypes";
-import cl from "./PeeringPage.module.css";
+} from "lucide-react"
+import { FormEvent, Fragment, useState } from "react"
+import { Badge } from "../components/Badge"
+import { Button } from "../components/Button"
+import { InputForm } from "../components/InputForm"
+import { IPeerConnection } from "../sharedTypes"
+import { DisconnectPrompt } from "./DisconnectPrompt"
+import { HistoryFile } from "./HistoryFile"
+import { HistoryMessage } from "./HistoryMessage"
+import cl from "./PeeringPage.module.css"
+import { usePeeringClient } from "./usePeeringClient"
+
+const ACCEPT_IMAGE = "image/*"
+const ACCEPT_FILE = "*/*"
 
 interface IProps {
-  peerConnection: IPeerConnection;
+  peerConnection: IPeerConnection
 }
 
-const IconButton = ({ Icon }: { Icon: LucideIcon }) => (
-  <div className={cl.iconButton}>
-    <Icon size={24} absoluteStrokeWidth />
-  </div>
-);
-
 export const PeeringPage = ({ peerConnection }: IProps) => {
-  const [error, setError] = useState<Error | null>(null);
+  const [disconnectPromptOpen, setDisconnectPromptOpen] = useState(false)
+  const [message, setMessage] = useState<string>("")
+  const {
+    history,
+    sendMessage,
+    offerFile,
+    acceptFile,
+    error,
+    connected,
+    disconnect,
+  } = usePeeringClient(peerConnection)
 
-  useEffect(() => {
-    if (!peerConnection) return;
-
-    const logger = new Logger("PeeringPage");
-    // TODO: create hook to manage the peer connection
-    // TODO: send data on the main messenger channel
-    // TODO: handle file transfer on separate data channel
-    // peerConnection.connection.addEventListener("connectionstatechange")
-    // peerConnection.connection.addEventListener("datachannel")
-    // peerConnection.connection.addEventListener("negotiationneeded")
-    // peerConnection.connection.addEventListener("signalingstatechange")
-    // peerConnection.connection.addEventListener("track")
-    peerConnection.channels.forEach((channel) => {
-      logger.debug("channel", channel);
-      channel.onmessage = (event) => {
-        logger.debug("channel message", event.data);
-      };
-      channel.onerror = (event) => {
-        logger.error("channel error", event);
-        setError(new Error("Channel error"));
-      };
-      channel.send(JSON.stringify({ type: "ping" }));
-    });
-  }, [peerConnection]);
-
-  if (error)
+  if (error) {
     return (
       <div className="page">
         <div>Error negotiating connection</div>
         <pre>{error.message}</pre>
       </div>
-    );
+    )
+  }
+
+  const handleMessageSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (message.trim()) {
+      sendMessage(message)
+    }
+    setMessage("")
+  }
+
+  const handleDisconnect = (shouldDisconnect?: boolean) => {
+    setDisconnectPromptOpen(false)
+    if (shouldDisconnect) {
+      disconnect()
+    }
+  }
+
+  const handleSendFileClick = (accept: string) => {
+    const input = document.createElement("input")
+    input.type = "file"
+    input.multiple = true
+    input.accept = accept
+    input.addEventListener("change", (e: Event) => {
+      const files = (e.target as HTMLInputElement).files
+      if (!files?.length) return
+
+      for (const file of files) {
+        offerFile(file)
+      }
+    })
+    input.click()
+  }
 
   return (
     <div className={clsx("page", cl.spacePage)}>
       <div className={cl.header}>
         <h1>Encrypted Space</h1>
-        <UnplugIcon size={16} strokeWidth={1} />
-        <Badge color="green">WebRTC</Badge>
+        {connected && (
+          <UnplugIcon
+            size={16}
+            strokeWidth={1}
+            onClick={() => setDisconnectPromptOpen(true)}
+          />
+        )}
+        <Badge color={connected ? "green" : "grey"}>WebRTC</Badge>
       </div>
 
       <div className={cl.space}>
-        <div className={cl.statusLabel}>START OF ENCRYPTED SPACE</div>
-
-        <div className={cl.message}>
-          This is a test of the system
-          <IconButton Icon={CopyIcon} />
-        </div>
-
-        <div className={clsx(cl.message, cl.remote)}>
-          https://lucide.dev/icons/copy
-          <IconButton Icon={CopyIcon} />
-        </div>
-
-        <div className={cl.file}>
-          <div>
-            <ImageIcon size={24} absoluteStrokeWidth />
-            IMG001232.jpg
-          </div>
-          <IconButton Icon={DownloadIcon} />
-        </div>
-        <div className={cl.message}>
-          This is a test of the system
-          <IconButton Icon={CopyIcon} />
-        </div>
-
-        <div className={clsx(cl.message, cl.remote)}>
-          https://lucide.dev/icons/copy
-          <IconButton Icon={CopyIcon} />
-        </div>
-
-        <div className={cl.file}>
-          <div>
-            <ImageIcon size={24} absoluteStrokeWidth />
-            IMG001232.jpg
-          </div>
-          <IconButton Icon={DownloadIcon} />
-        </div>
-        <div className={cl.message}>
-          This is a test of the system
-          <IconButton Icon={CopyIcon} />
-        </div>
-
-        <div className={clsx(cl.message, cl.remote)}>
-          https://lucide.dev/icons/copy
-          <IconButton Icon={CopyIcon} />
-        </div>
-
-        <div className={cl.file}>
-          <div>
-            <ImageIcon size={24} absoluteStrokeWidth />
-            IMG001232.jpg
-          </div>
-          <IconButton Icon={DownloadIcon} />
-        </div>
-        <div className={cl.message}>
-          This is a test of the system
-          <IconButton Icon={CopyIcon} />
-        </div>
-
-        <div className={clsx(cl.message, cl.remote)}>
-          https://lucide.dev/icons/copy
-          <IconButton Icon={CopyIcon} />
-        </div>
-
-        <div className={clsx(cl.file, cl.remote)}>
-          <div>
-            <ImageIcon size={24} absoluteStrokeWidth />
-            IMG001232.jpg
-          </div>
-          <IconButton Icon={DownloadIcon} />
-        </div>
-
-        <div className={cl.statusLabel}>ENCRYPTED SPACE ENDED</div>
+        {history.map((item, index) =>
+          item.type === "status" ? (
+            <Fragment key={index}>
+              <div className={cl.statusLabel}>{item.message}</div>
+              {item.isDisconnected && (
+                <Button
+                  onClick={() => window.location.reload()}
+                  style={{ width: "100%" }}
+                >
+                  <RefreshCcwIcon size={16} strokeWidth={1} />
+                  Connect to Another Device
+                </Button>
+              )}
+            </Fragment>
+          ) : item.type === "message" ? (
+            <HistoryMessage item={item} key={index} />
+          ) : item.type === "file" ? (
+            <HistoryFile
+              item={item}
+              key={index}
+              onDownload={() => acceptFile(item.file.id)}
+            />
+          ) : null
+        )}
       </div>
 
       <div className={cl.buttons}>
-        <Button leftIcon>
+        <Button
+          leftIcon
+          disabled={!connected}
+          onClick={() => handleSendFileClick(ACCEPT_FILE)}
+        >
           <FileUpIcon size={32} absoluteStrokeWidth />
           Send File
         </Button>
-        <Button leftIcon>
+        <Button
+          leftIcon
+          disabled={!connected}
+          onClick={() => handleSendFileClick(ACCEPT_IMAGE)}
+        >
           <ImageUpIcon size={32} absoluteStrokeWidth />
           Send Image
         </Button>
       </div>
 
-      <InputForm onSubmit={console.log} />
+      <InputForm
+        disabled={!connected}
+        canSubmit={message.trim() !== ""}
+        onSubmit={handleMessageSubmit}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+      />
+
+      <DisconnectPrompt
+        open={disconnectPromptOpen}
+        onClose={handleDisconnect}
+      />
     </div>
-  );
-};
+  )
+}

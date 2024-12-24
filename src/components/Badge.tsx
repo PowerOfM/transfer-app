@@ -1,5 +1,5 @@
-import clsx from "clsx";
-import cl from "./Badge.module.css";
+import clsx from "clsx"
+import cl from "./Badge.module.css"
 
 type BadgeColor = "grey" | "pink" | "green";
 
@@ -10,5 +10,5 @@ interface IProps {
 }
 
 export const Badge = ({ className, color, children }: IProps) => {
-  return <div className={clsx(cl.badge, className, cl[color])}>{children}</div>;
-};
+  return <div className={clsx(cl.badge, className, cl[color])}>{children}</div>
+}

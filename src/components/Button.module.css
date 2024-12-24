@@ -12,6 +12,19 @@
   font-weight: 500;
   cursor: pointer;
   border: none;
+  transition: background-color 0.2s ease-in-out;
+
+  &:disabled {
+    background-color: var(--grey);
+    pointer-events: none;
+
+    &:hover {
+      background-color: var(--grey);
+    }
+    &:active {
+      background-color: var(--grey);
+    }
+  }
 
   &:hover {
     background-color: color-mix(in srgb, var(--primary), var(--white) 20%);

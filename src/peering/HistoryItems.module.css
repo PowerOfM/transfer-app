@@ -1,0 +1,48 @@
+.historyItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-left: 10px;
+  border-left: 2px solid var(--green);
+  overflow: hidden;
+
+  &.self {
+    border-left-color: var(--primary);
+  }
+}
+
+.file {
+  --progress: 0%;
+
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--green), transparent 75%);
+
+  & > div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .progress {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--progress);
+    height: 100%;
+    background: var(--green);
+    z-index: -1;
+  }
+
+  &.self {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary), transparent 75%);
+
+    .progress {
+      background: var(--primary);
+    }
+  }
+}

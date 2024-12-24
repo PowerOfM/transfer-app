@@ -1,7 +1,7 @@
-import clsx from "clsx";
-import { Badge } from "./Badge";
-import { ConnectionArrow } from "./ConnectionArrow";
-import cl from "./ConnectionPage.module.css";
+import clsx from "clsx"
+import { Badge } from "./Badge"
+import { ConnectionArrow } from "./ConnectionArrow"
+import cl from "./ConnectionPage.module.css"
 
 export const ConnectionPage = ({ message }: { message: string }) => (
   <div className={clsx("page", cl.connection)}>
@@ -13,4 +13,4 @@ export const ConnectionPage = ({ message }: { message: string }) => (
 
     <div className={cl.info}>{message}</div>
   </div>
-);
+)

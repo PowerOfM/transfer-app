@@ -38,43 +38,11 @@
     justify-content: space-between;
     gap: 10px;
     padding-left: 10px;
-    border-left: 2px solid var(--primary);
+    border-left: 2px solid var(--green);
     overflow: hidden;
 
-    &.remote {
-      border-left-color: var(--green);
-    }
-  }
-
-  .file {
-    border: 1px solid var(--primary);
-    border-radius: var(--radius);
-    background: color-mix(in srgb, var(--primary), transparent 75%);
-
-    & > div {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    &:before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 5%;
-      height: 100%;
-      background: var(--primary);
-      z-index: -1;
-    }
-
-    &.remote {
-      border-color: var(--green);
-      background: color-mix(in srgb, var(--green), transparent 75%);
-
-      &:before {
-        background: var(--green);
-      }
+    &.self {
+      border-left-color: var(--primary);
     }
   }
 }
@@ -86,14 +54,5 @@
 
   button {
     flex: 1;
-  }
-}
-
-.iconButton {
-  padding: 15px;
-  cursor: pointer;
-  border-radius: var(--radius);
-  &:hover {
-    background: color-mix(in srgb, var(--primary), transparent 75%);
   }
 }

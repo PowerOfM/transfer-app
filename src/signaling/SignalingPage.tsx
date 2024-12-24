@@ -1,55 +1,55 @@
-import clsx from "clsx";
-import { useEffect, useState } from "react";
-import { Badge } from "../components/Badge";
-import { Button } from "../components/Button";
-import { ConnectionPage } from "../components/ConnectionPage";
-import { EmojiSelectModal } from "../components/EmojiSelectModal";
-import { DiscoverIPHelper } from "../helpers/DiscoverIPHelper";
-import { RandomGenerator } from "../helpers/RandomGenerator";
-import { useAsync } from "../helpers/useAsync";
-import { useLocalStorage } from "../helpers/useLocalStorage";
-import { IPeerConnection } from "../sharedTypes";
-import { ISignalingPeer } from "./SignalingClient";
-import cl from "./SignalingPage.module.css";
-import { useSignalingClient } from "./useSignalingClient";
+import clsx from "clsx"
+import { useEffect, useState } from "react"
+import { Badge } from "../components/Badge"
+import { Button } from "../components/Button"
+import { ConnectionPage } from "../components/ConnectionPage"
+import { EmojiSelectModal } from "../components/EmojiSelectModal"
+import { DiscoverIPHelper } from "../helpers/DiscoverIPHelper"
+import { RandomGenerator } from "../helpers/RandomGenerator"
+import { useAsync } from "../helpers/useAsync"
+import { useLocalStorage } from "../helpers/useLocalStorage"
+import { IPeerConnection } from "../sharedTypes"
+import { ISignalingPeer } from "./SignalingClient"
+import cl from "./SignalingPage.module.css"
+import { useSignalingClient } from "./useSignalingClient"
 
 interface IProps {
-  onReady(result: IPeerConnection): void;
+  onReady(result: IPeerConnection): void
 }
 
 export const SignalingPage = ({ onReady }: IProps) => {
-  const [ipResult, ipLoading] = useAsync(() => DiscoverIPHelper.getIp());
-  const [autoDiscoveryEnabled, setAutoDiscoveryEnabled] = useState(false);
+  const [ipResult, ipLoading] = useAsync(() => DiscoverIPHelper.getIp())
+  const [autoDiscoveryEnabled, setAutoDiscoveryEnabled] = useState(false)
 
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const [emoji, setEmoji] = useLocalStorage("emoji", RandomGenerator.emoji());
-  const [emojiModalOpen, setEmojiModalOpen] = useState(false);
+  const [roomId, setRoomId] = useState<string | null>(null)
+  const [emoji, setEmoji] = useLocalStorage("emoji", RandomGenerator.emoji())
+  const [emojiModalOpen, setEmojiModalOpen] = useState(false)
 
-  const client = useSignalingClient(roomId, emoji, onReady);
+  const client = useSignalingClient(roomId, emoji, onReady)
 
   useEffect(() => {
-    if (ipLoading) return;
+    if (ipLoading) return
 
     if (ipResult) {
-      setRoomId(ipResult);
-      setAutoDiscoveryEnabled(true);
+      setRoomId(ipResult)
+      setAutoDiscoveryEnabled(true)
     } else {
-      setRoomId((prev) => prev ?? crypto.randomUUID());
-      setAutoDiscoveryEnabled(false);
+      setRoomId((prev) => prev ?? crypto.randomUUID())
+      setAutoDiscoveryEnabled(false)
     }
-  }, [ipResult, ipLoading]);
+  }, [ipResult, ipLoading])
 
   if (client.error)
-    return <div className="page">Error! {client.error?.message}</div>;
+    return <div className="page">Error! {client.error?.message}</div>
   if (client.state === "signaling")
-    return <ConnectionPage message="Waiting for other device" />;
+    return <ConnectionPage message="Waiting for other device" />
   if (client.state === "negotiating")
-    return <ConnectionPage message="Negotiating secure connection" />;
+    return <ConnectionPage message="Negotiating secure connection" />
 
-  const clientLoading = client.state === "loading";
+  const clientLoading = client.state === "loading"
   const handlePeerClick = (peer: ISignalingPeer) => {
-    client.sendRequest(peer.id);
-  };
+    client.sendRequest(peer.id)
+  }
 
   return (
     <div className="page">
@@ -75,7 +75,7 @@ export const SignalingPage = ({ onReady }: IProps) => {
       </div>
 
       {client.peers.map((peer) => {
-        const isYou = peer.id === client.id || peer.id === "1";
+        const isYou = peer.id === client.id
         return (
           <div
             key={peer.id}
@@ -88,7 +88,7 @@ export const SignalingPage = ({ onReady }: IProps) => {
             />
             {peer.name} {isYou && "(you)"}
           </div>
-        );
+        )
       })}
 
       <EmojiSelectModal
@@ -96,11 +96,11 @@ export const SignalingPage = ({ onReady }: IProps) => {
         open={emojiModalOpen}
         onClose={(emoji) => {
           if (emoji) {
-            setEmoji(emoji);
+            setEmoji(emoji)
           }
-          setEmojiModalOpen(false);
+          setEmojiModalOpen(false)
         }}
       />
     </div>
-  );
-};
+  )
+}
