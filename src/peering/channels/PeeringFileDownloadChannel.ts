@@ -1,7 +1,9 @@
-import { PeeringFileChannel } from "./PeeringFileChannel"
-import { ITransferCommand } from "./shared"
+import {
+  AbstractPeeringFileChannel,
+  IFileCommand,
+} from "./AbstractPeeringFileChannel"
 
-export class PeeringFileDownloadChannel extends PeeringFileChannel {
+export class PeeringFileDownloadChannel extends AbstractPeeringFileChannel {
   public onDataComplete = this.registerEvent<[Blob]>()
 
   private protocol: "json" | "binary" = "json"
@@ -13,19 +15,32 @@ export class PeeringFileDownloadChannel extends PeeringFileChannel {
     super(channel)
   }
 
-  public start() {
+  private waitUntilOpen() {
+    if (this.channel.readyState === "open") return
+
+    return new Promise<void>((resolve, reject) => {
+      const listener = this.onClose(reject)
+      this.onOpen(() => {
+        listener.unbind()
+        resolve()
+      })
+    })
+  }
+
+  public async start() {
+    await this.waitUntilOpen()
     super.send({ type: "file-request", fileId: this.fileId })
   }
 
-  protected handleMessage = (event: MessageEvent) => {
+  protected processMessage(event: MessageEvent) {
     if (this.protocol === "json") {
-      super.handleJsonMessage(event)
+      super.processMessage(event)
     } else {
-      this.handleBinaryMessage(event)
+      this.processBinaryMessage(event)
     }
   }
 
-  protected handleBinaryMessage = (event: MessageEvent<ArrayBuffer>) => {
+  protected processBinaryMessage(event: MessageEvent<ArrayBuffer>) {
     this.logger.debug(`Received ${event.data.byteLength} bytes of binary data`)
 
     this.receivedBufferSize += event.data.byteLength
@@ -41,7 +56,7 @@ export class PeeringFileDownloadChannel extends PeeringFileChannel {
     }
   }
 
-  protected processCommand(command: ITransferCommand) {
+  protected processCommand(command: IFileCommand) {
     switch (command.type) {
       case "ready-to-upload":
         this.targetBufferSize = command.bufferSize

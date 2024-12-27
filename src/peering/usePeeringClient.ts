@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 import { IPeerConnection } from "../sharedTypes"
 import { PeeringClient, PeeringState } from "./PeeringClient"
-import { IFileOffered, IFileReceived } from "./channels/shared"
+import {
+  IFileOffered,
+  IFileReceived,
+} from "./channels/AbstractPeeringFileChannel"
 
 export interface IHistoryStatusItem {
   type: "status"
@@ -56,17 +59,49 @@ export const usePeeringClient = (peerConnection: IPeerConnection) => {
           { type: "message", message, self: false },
         ])
       }),
-      client.onFileOffered((file) => {
+      client.onFileReceived((file) => {
         setHistory((prev) => [...prev, { type: "file", file, self: false }])
       }),
+      client.onFileDownloadStarted((file) => {
+        setHistory((prev) => {
+          const next = [...prev]
+          const targetIndex = next.findIndex(
+            (item) => item.type === "file" && item.file.id === file.id
+          )
+          if (targetIndex !== -1) {
+            next[targetIndex] = {
+              ...(prev[targetIndex] as IHistoryFileItem),
+              file,
+            }
+          } else {
+            next.push({ type: "file", file, self: false })
+          }
+          return next
+        })
+      }),
+      client.onFileDownloadComplete((file, blob) => {
+        setHistory((prev) => {
+          const next = [...prev]
+          const targetIndex = next.findIndex(
+            (item) => item.type === "file" && item.file.id === file.id
+          )
+          if (targetIndex !== -1) {
+            next[targetIndex] = {
+              ...(prev[targetIndex] as IHistoryFileItem),
+              file: { ...file, blob },
+            }
+          }
+          return next
+        })
+      }),
       client.onStateChange((state) => {
-        if (state === PeeringState.Connected) {
+        if (state === PeeringState.Open) {
           addHistoryStatus("Start of Encrypted Space")
         } else if (state === PeeringState.Disconnected) {
           addHistoryStatus("Encrypted Space Ended", true)
         }
 
-        setConnected(state === PeeringState.Connected)
+        setConnected(state === PeeringState.Open)
       }),
     ]
 

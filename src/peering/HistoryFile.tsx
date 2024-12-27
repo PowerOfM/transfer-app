@@ -34,10 +34,12 @@ export const HistoryFile = ({ item, onDownload }: IProps) => {
           ? item.file.metadata.name + ` (${item.file.metadata.size} bytes)`
           : item.file.file.name + ` (${item.file.file.size} bytes)`}
       </div>
-      <IconButton
-        Icon={DownloadIcon}
-        onClick={() => onDownload(item.file.id)}
-      />
+      {!item.self && (
+        <IconButton
+          Icon={DownloadIcon}
+          onClick={() => onDownload(item.file.id)}
+        />
+      )}
     </div>
   )
 }

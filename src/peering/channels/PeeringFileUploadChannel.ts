@@ -1,14 +1,14 @@
 import { Signal } from "../../helpers/Signal"
-import { PeeringFileChannel } from "./PeeringFileChannel"
 import {
+  AbstractPeeringFileChannel,
+  IFileCommand,
+  IFileCommandRequest,
   IFileOffered,
-  ITransferCommand,
-  ITransferCommandRequest,
-} from "./shared"
+} from "./AbstractPeeringFileChannel"
 
 const CHUNK_SIZE = 16384
 
-export class PeeringFileUploadChannel extends PeeringFileChannel {
+export class PeeringFileUploadChannel extends AbstractPeeringFileChannel {
   private requestedFile: IFileOffered | null = null
 
   constructor(
@@ -18,7 +18,7 @@ export class PeeringFileUploadChannel extends PeeringFileChannel {
     super(channel)
   }
 
-  protected processCommand(command: ITransferCommand) {
+  protected processCommand(command: IFileCommand) {
     switch (command.type) {
       case "file-request":
         this.withErrorHandling(this.handleFileRequest(command))
@@ -44,7 +44,7 @@ export class PeeringFileUploadChannel extends PeeringFileChannel {
     }
   }
 
-  private async handleFileRequest({ fileId }: ITransferCommandRequest) {
+  private async handleFileRequest({ fileId }: IFileCommandRequest) {
     const fileOffer = this.filesOffered.find((file) => file.id === fileId)
     if (!fileOffer) {
       throw new Error("File not found")
@@ -96,14 +96,20 @@ export class PeeringFileUploadChannel extends PeeringFileChannel {
 
       this.channel.send(data)
       offset += data.byteLength
-      progressSignal.emit(offset)
+      progressSignal.emit(Math.round((offset / file.size) * 100))
 
       if (offset < file.size) {
-        readSlice(offset)
+        setTimeout(() => readSlice(offset), 500)
+        // readSlice(offset)
       }
     })
 
     const readSlice = (offset: number) => {
+      if (this.channel.readyState !== "open") {
+        this.logger.debug("Channel not open, stopping transfer")
+        return
+      }
+
       this.logger.debug("Reading slice", offset)
       const slice = file.slice(offset, offset + CHUNK_SIZE)
       fileReader.readAsArrayBuffer(slice)

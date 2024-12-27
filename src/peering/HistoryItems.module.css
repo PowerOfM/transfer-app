@@ -19,6 +19,7 @@
   border: 1px solid var(--green);
   border-radius: var(--radius);
   background: color-mix(in srgb, var(--green), transparent 75%);
+  min-height: 56px;
 
   & > div {
     display: flex;

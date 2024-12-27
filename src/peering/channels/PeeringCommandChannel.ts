@@ -1,4 +1,5 @@
-import { PeeringChannel } from "./PeeringChannel"
+import { AbstractPeeringChannel } from "./AbstractPeeringChannel"
+import { IFileReceived } from "./AbstractPeeringFileChannel"
 
 export interface IMessage {
   type: "message"
@@ -21,9 +22,9 @@ export interface IFileOffer {
 
 export type ICommand = IMessage | IFileOffer
 
-export class PeeringCommandChannel extends PeeringChannel<ICommand> {
+export class PeeringCommandChannel extends AbstractPeeringChannel<ICommand> {
   public onMessage = this.registerEvent<[string]>()
-  public onOfferFile = this.registerEvent<[string, IFileMetadata]>()
+  public onFileReceived = this.registerEvent<[IFileReceived]>()
 
   protected validateCommand(data: unknown): data is ICommand {
     if (!data || typeof data !== "object") return false
@@ -54,7 +55,7 @@ export class PeeringCommandChannel extends PeeringChannel<ICommand> {
         this.emit(this.onMessage, command.message)
         break
       case "file":
-        this.emit(this.onOfferFile, command.file.id, command.file.metadata)
+        this.emit(this.onFileReceived, command.file)
         break
     }
   }

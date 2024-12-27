@@ -1,13 +1,13 @@
 import { EventEmitter } from "typed-event-emitter"
 import { Logger } from "../../helpers/Logger"
 
-export abstract class PeeringChannel<
+export abstract class AbstractPeeringChannel<
   T extends object = object
 > extends EventEmitter {
-  public onOpen = this.registerEvent<[PeeringChannel, Event]>()
-  public onClose = this.registerEvent<[PeeringChannel, Event]>()
-  public onError = this.registerEvent<[PeeringChannel, Event]>()
-  public onDataError = this.registerEvent<[PeeringChannel, Error]>()
+  public onOpen = this.registerEvent<[this, Event]>()
+  public onClose = this.registerEvent<[this, Event]>()
+  public onError = this.registerEvent<[this, Event]>()
+  public onDataError = this.registerEvent<[this, Error]>()
 
   protected readonly logger = new Logger("PeeringChannel")
 
@@ -19,7 +19,7 @@ export abstract class PeeringChannel<
     return this.channel.label
   }
 
-  constructor(protected readonly channel: RTCDataChannel) {
+  constructor(public readonly channel: RTCDataChannel) {
     super()
     this.channel.addEventListener("message", this.handleMessage)
     this.channel.addEventListener("open", this.handleOpen)
@@ -43,7 +43,7 @@ export abstract class PeeringChannel<
     this.channel.protocol
   }
 
-  protected handleJsonMessage(event: MessageEvent) {
+  protected processMessage(event: MessageEvent) {
     try {
       const data = JSON.parse(event.data) as unknown
       if (!this.validateCommand(data)) {
@@ -62,7 +62,7 @@ export abstract class PeeringChannel<
   protected abstract processCommand(data: T): void
 
   protected handleMessage = (event: MessageEvent) => {
-    this.handleJsonMessage(event)
+    this.processMessage(event)
   }
 
   protected handleOpen = (event: Event) => {

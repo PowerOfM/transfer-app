@@ -16,7 +16,7 @@ const ID_STORAGE_KEY = "mqtt-client-id"
 const ID_TIMESTAMP_KEY = "mqtt-client-id-timestamp"
 const ID_EXPIRY_MS = 24 * 60 * 1000
 
-type ClientStatus = "disconnected" | "connecting" | "connected" | "error"
+type ClientStatus = "disconnected" | "connecting" | "open" | "error"
 
 /**
  * MQTT client that encrypts and decrypts messages.
@@ -66,7 +66,7 @@ export class EncryptedMQTTClient extends EventEmitter {
     this.client.on("connect", () => {
       this.emit(this.onConnect)
       this.logger.debug("Connected!")
-      this._status = "connected"
+      this._status = "open"
     })
   }
 
