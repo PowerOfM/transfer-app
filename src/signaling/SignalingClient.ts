@@ -99,6 +99,7 @@ export class SignalingClient extends EventEmitter {
   }
 
   public async destroy(graceful = false) {
+    this.removeListener()
     window.clearInterval(this.updatePeersTimer)
     window.clearInterval(this.disconnectTimer)
 
@@ -180,7 +181,7 @@ export class SignalingClient extends EventEmitter {
   }
 
   private waitForClient() {
-    if (this.client.status === "connected") return
+    if (this.client.status === "open") return
     if (
       this.client.status === "error" ||
       this.client.status === "disconnected"

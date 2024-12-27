@@ -118,6 +118,7 @@ export class EncryptedMQTTClient extends EventEmitter {
   }
 
   public async destroy() {
+    this.removeListener()
     await this.client.endAsync()
     this._status = "disconnected"
     this.channelName = undefined

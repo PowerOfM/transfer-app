@@ -51,66 +51,45 @@ export const usePeeringClient = (peerConnection: IPeerConnection) => {
     const client = new PeeringClient(peerConnection.connection)
     clientRef.current = client
 
-    const listeners = [
-      client.onError(setError),
-      client.onMessage((message) => {
-        setHistory((prev) => [
-          ...prev,
-          { type: "message", message, self: false },
-        ])
-      }),
-      client.onFileReceived((file) => {
-        setHistory((prev) => [...prev, { type: "file", file, self: false }])
-      }),
-      client.onFileDownloadStarted((file) => {
-        setHistory((prev) => {
-          const next = [...prev]
-          const targetIndex = next.findIndex(
-            (item) => item.type === "file" && item.file.id === file.id
-          )
-          if (targetIndex !== -1) {
-            next[targetIndex] = {
-              ...(prev[targetIndex] as IHistoryFileItem),
-              file,
-            }
-          } else {
-            next.push({ type: "file", file, self: false })
+    client.onError(setError)
+    client.onMessage((message) => {
+      setHistory((prev) => [...prev, { type: "message", message, self: false }])
+    })
+    client.onFileReceived((file) => {
+      setHistory((prev) => [...prev, { type: "file", file, self: false }])
+    })
+    client.onFileUpdated((file) => {
+      setHistory((prev) => {
+        const next = [...prev]
+        const targetIndex = next.findIndex(
+          (item) => item.type === "file" && item.file.id === file.id
+        )
+        if (targetIndex !== -1) {
+          next[targetIndex] = {
+            ...(prev[targetIndex] as IHistoryFileItem),
+            file,
           }
-          return next
-        })
-      }),
-      client.onFileDownloadComplete((file, blob) => {
-        setHistory((prev) => {
-          const next = [...prev]
-          const targetIndex = next.findIndex(
-            (item) => item.type === "file" && item.file.id === file.id
-          )
-          if (targetIndex !== -1) {
-            next[targetIndex] = {
-              ...(prev[targetIndex] as IHistoryFileItem),
-              file: { ...file, blob },
-            }
-          }
-          return next
-        })
-      }),
-      client.onStateChange((state) => {
-        if (state === PeeringState.Open) {
-          addHistoryStatus("Start of Encrypted Space")
-        } else if (state === PeeringState.Disconnected) {
-          addHistoryStatus("Encrypted Space Ended", true)
+        } else {
+          next.push({ type: "file", file, self: false })
         }
+        return next
+      })
+    })
+    client.onStateChange((state) => {
+      if (state === PeeringState.Open) {
+        addHistoryStatus("Start of Encrypted Space")
+      } else if (state === PeeringState.Disconnected) {
+        addHistoryStatus("Encrypted Space Ended", true)
+      }
 
-        setConnected(state === PeeringState.Open)
-      }),
-    ]
+      setConnected(state === PeeringState.Open)
+    })
 
     if (peerConnection.isInitiator) {
       client.initiate()
     }
 
     return () => {
-      listeners.forEach((listener) => listener.unbind())
       client.destroy()
       clientRef.current = undefined
     }

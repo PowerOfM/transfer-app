@@ -70,10 +70,8 @@ export class NegotiationClient extends EventEmitter {
 
   public cleanup() {
     this.logger.debug("Negotiation complete. Cleaning up negotiation client")
-    this.connection.removeEventListener(
-      "icecandidate",
-      this.handleIceCandidate
-    )
+    this.removeListener()
+    this.connection.removeEventListener("icecandidate", this.handleIceCandidate)
     this.connection.removeEventListener("datachannel", this.handleDataChannel)
 
     if (this.messengerChannel) {
@@ -174,7 +172,6 @@ export class NegotiationClient extends EventEmitter {
 
   private handleChannelOpen = (ev: Event) => {
     const channel = ev.target as RTCDataChannel
-    this.logger.debug("Data channel is open and ready to be used.", channel)
     channel.close()
     this.emit(this.onConnected, this.connection)
   }

@@ -1,17 +1,24 @@
+import toast from "react-hot-toast"
+import { FileSaver } from "../../helpers/FileSaver"
+import { Signal } from "../../helpers/Signal"
 import {
   AbstractPeeringFileChannel,
   IFileCommand,
+  IFileReceived,
 } from "./AbstractPeeringFileChannel"
 
 export class PeeringFileDownloadChannel extends AbstractPeeringFileChannel {
-  public onDataComplete = this.registerEvent<[Blob]>()
+  public onDataComplete = this.registerEvent<[]>()
 
   private protocol: "json" | "binary" = "json"
   private targetBufferSize: number = 0
   private receivedBufferSize: number = 0
   private receivedBuffer: ArrayBuffer[] = []
 
-  constructor(channel: RTCDataChannel, public readonly fileId: string) {
+  constructor(
+    channel: RTCDataChannel,
+    public readonly requestedFile: IFileReceived
+  ) {
     super(channel)
   }
 
@@ -29,7 +36,7 @@ export class PeeringFileDownloadChannel extends AbstractPeeringFileChannel {
 
   public async start() {
     await this.waitUntilOpen()
-    super.send({ type: "file-request", fileId: this.fileId })
+    super.send({ type: "file-request", fileId: this.requestedFile.id })
   }
 
   protected processMessage(event: MessageEvent) {
@@ -41,17 +48,24 @@ export class PeeringFileDownloadChannel extends AbstractPeeringFileChannel {
   }
 
   protected processBinaryMessage(event: MessageEvent<ArrayBuffer>) {
-    this.logger.debug(`Received ${event.data.byteLength} bytes of binary data`)
+    if (!this.ensureActive(this.requestedFile.progressSignal)) {
+      return
+    }
 
     this.receivedBufferSize += event.data.byteLength
     this.receivedBuffer.push(event.data)
+    this.requestedFile.progressSignal?.emit(
+      Math.floor((this.receivedBufferSize / this.targetBufferSize) * 100)
+    )
 
     if (this.receivedBufferSize === this.targetBufferSize) {
       const fileBlob = new Blob(this.receivedBuffer)
       this.logger.debug(
         `Received file of size ${fileBlob.size} bytes. Closing transfer channel.`
       )
-      this.emit(this.onDataComplete, fileBlob)
+      FileSaver.save(this.requestedFile.metadata, fileBlob)
+      this.requestedFile.blob = fileBlob
+      this.emit(this.onDataComplete)
       this.channel.close()
     }
   }
@@ -79,5 +93,20 @@ export class PeeringFileDownloadChannel extends AbstractPeeringFileChannel {
         this.channel.close()
         break
     }
+  }
+
+  private ensureActive(signal?: Signal<number>): boolean {
+    if (this.channel.readyState !== "open") {
+      this.logger.debug("Channel not open, stopping transfer")
+      toast.error("Transfer cancelled by other device")
+      return false
+    }
+    if (signal?.isAborted) {
+      this.logger.debug("Abort signal received, stopping transfer")
+      toast.success("Transfer cancelled")
+      this.channel.close()
+      return false
+    }
+    return true
   }
 }

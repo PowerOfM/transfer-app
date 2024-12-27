@@ -32,6 +32,7 @@ export abstract class AbstractPeeringChannel<
     this.channel.removeEventListener("open", this.handleOpen)
     this.channel.removeEventListener("close", this.handleClose)
     this.channel.removeEventListener("error", this.handleError)
+    this.removeListener()
   }
 
   public send(data: T): void {

@@ -22,9 +22,15 @@
   min-height: 56px;
 
   & > div {
+    width: 100%;
     display: flex;
     align-items: center;
     gap: 10px;
+
+    span {
+      flex: 1;
+      line-break: anywhere;
+    }
   }
 
   .progress {
@@ -36,6 +42,7 @@
     height: 100%;
     background: var(--green);
     z-index: -1;
+    transition: width 0.3s ease-in-out;
   }
 
   &.self {
@@ -43,7 +50,12 @@
     background: color-mix(in srgb, var(--primary), transparent 75%);
 
     .progress {
-      background: var(--primary);
+      background: color-mix(in srgb, var(--primary), transparent 35%);
     }
+  }
+
+  .spacer {
+    width: 54px;
+    height: 54px;
   }
 }

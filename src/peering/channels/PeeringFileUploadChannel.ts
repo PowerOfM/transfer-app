@@ -1,3 +1,4 @@
+import toast from "react-hot-toast"
 import { Signal } from "../../helpers/Signal"
 import {
   AbstractPeeringFileChannel,
@@ -9,6 +10,7 @@ import {
 const CHUNK_SIZE = 16384
 
 export class PeeringFileUploadChannel extends AbstractPeeringFileChannel {
+  public onUploadStarted = this.registerEvent<[IFileOffered]>()
   private requestedFile: IFileOffered | null = null
 
   constructor(
@@ -54,7 +56,7 @@ export class PeeringFileUploadChannel extends AbstractPeeringFileChannel {
       fileOffer.progressSignal.destroy()
     }
     fileOffer.progressSignal = new Signal<number>()
-
+    this.emit(this.onUploadStarted, fileOffer)
     this.requestedFile = fileOffer
     this.send({
       type: "ready-to-upload",
@@ -81,7 +83,7 @@ export class PeeringFileUploadChannel extends AbstractPeeringFileChannel {
       this.send({ type: "error", message: "File reading aborted" })
     )
     fileReader.addEventListener("load", (e) => {
-      if (progressSignal.isAborted) {
+      if (!this.ensureActive(progressSignal)) {
         return
       }
 
@@ -96,25 +98,38 @@ export class PeeringFileUploadChannel extends AbstractPeeringFileChannel {
 
       this.channel.send(data)
       offset += data.byteLength
-      progressSignal.emit(Math.round((offset / file.size) * 100))
+      progressSignal.emit(Math.floor((offset / file.size) * 100))
 
       if (offset < file.size) {
-        setTimeout(() => readSlice(offset), 500)
-        // readSlice(offset)
+        readSlice(offset)
       }
     })
 
     const readSlice = (offset: number) => {
-      if (this.channel.readyState !== "open") {
-        this.logger.debug("Channel not open, stopping transfer")
+      if (!this.ensureActive(progressSignal)) {
         return
       }
 
-      this.logger.debug("Reading slice", offset)
       const slice = file.slice(offset, offset + CHUNK_SIZE)
       fileReader.readAsArrayBuffer(slice)
     }
 
     readSlice(0)
+  }
+
+  private ensureActive(signal: Signal<number>): boolean {
+    if (this.channel.readyState !== "open") {
+      this.logger.debug("Channel not open, stopping transfer")
+      toast.error("Transfer cancelled by other device")
+      signal.abort()
+      return false
+    }
+    if (signal.isAborted) {
+      this.logger.debug("Abort signal received, stopping transfer")
+      toast.success("Transfer cancelled")
+      this.channel.close()
+      return false
+    }
+    return true
   }
 }

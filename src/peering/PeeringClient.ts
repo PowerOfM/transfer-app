@@ -1,6 +1,6 @@
+import toast from "react-hot-toast"
 import { EventEmitter } from "typed-event-emitter"
 import { Logger } from "../helpers/Logger"
-import { RTCSpeedMonitor } from "../helpers/RTCSpeedMonitor"
 import { Signal } from "../helpers/Signal"
 import {
   AbstractPeeringFileChannel,
@@ -26,9 +26,8 @@ export class PeeringClient extends EventEmitter {
   public onError = this.registerEvent<[Error]>()
   public onMessage = this.registerEvent<[string]>()
   public onFileReceived = this.registerEvent<[IFileReceived]>()
+  public onFileUpdated = this.registerEvent<[IFileOffered | IFileReceived]>()
   public onStateChange = this.registerEvent<[PeeringState]>()
-  public onFileDownloadStarted = this.registerEvent<[IFileReceived]>()
-  public onFileDownloadComplete = this.registerEvent<[IFileReceived, Blob]>()
 
   private commandChannel: PeeringCommandChannel | null = null
   private readonly transferChannels: AbstractPeeringFileChannel[] = []
@@ -53,7 +52,6 @@ export class PeeringClient extends EventEmitter {
       "connectionstatechange",
       this.handleConnectionStateChange
     )
-    this.connection.addEventListener("track", this.handleTrack)
   }
 
   public initiate() {
@@ -61,20 +59,18 @@ export class PeeringClient extends EventEmitter {
   }
 
   public destroy() {
+    this.removeListener()
     this.connection.close()
     this.connection.removeEventListener("datachannel", this.handleDataChannel)
     this.connection.removeEventListener(
       "connectionstatechange",
       this.handleConnectionStateChange
     )
-    this.connection.removeEventListener("track", this.handleTrack)
 
     if (this.commandChannel) {
       this.commandChannel.destroy()
     }
-    this.transferChannels.forEach((channel) => {
-      this.cleanupChannel(channel)
-    })
+    this.transferChannels.forEach((channel) => channel.destroy())
 
     this.state = PeeringState.Disconnected
   }
@@ -87,17 +83,8 @@ export class PeeringClient extends EventEmitter {
     const id = crypto.randomUUID()
     this.filesOffered.push({ id, file })
 
-    this.sendCommand({
-      type: "file",
-      file: {
-        id,
-        metadata: {
-          type: file.type,
-          name: file.name,
-          size: file.size,
-        },
-      },
-    })
+    const metadata = { type: file.type, name: file.name, size: file.size }
+    this.sendCommand({ type: "file", file: { id, metadata } })
     return id
   }
 
@@ -107,33 +94,20 @@ export class PeeringClient extends EventEmitter {
       throw new Error("File not found in received list")
     }
 
-    const progressSignal = new Signal<number>()
-    targetFile.progressSignal = progressSignal
-
-    const speedMonitor = new RTCSpeedMonitor(
-      this.connection,
-      targetFile.metadata.size,
-      progressSignal
-    )
-
     const downloadChannel = new PeeringFileDownloadChannel(
       this.connection.createDataChannel("transfer-" + fileId),
-      fileId
+      targetFile
     )
-    downloadChannel.onDataComplete((blob) => {
-      targetFile.blob = blob
-      this.emit(this.onFileDownloadComplete, targetFile, blob)
-      this.saveFile(targetFile)
+    downloadChannel.onDataComplete(() => {
+      this.emit(this.onFileUpdated, targetFile)
     })
-    downloadChannel.onClose(() => {
-      this.logger.debug("Download channel closed", fileId)
-      speedMonitor.stop()
+    downloadChannel.onOpen(() => {
+      targetFile.progressSignal = new Signal<number>()
+      downloadChannel.start()
+      this.emit(this.onFileUpdated, targetFile)
     })
 
-    this.addTransferChannel(downloadChannel)
-    this.emit(this.onFileDownloadStarted, targetFile)
-    downloadChannel.start()
-    speedMonitor.start()
+    this.setupTransferChannel(downloadChannel)
   }
 
   private sendCommand(command: ICommand): void {
@@ -144,35 +118,35 @@ export class PeeringClient extends EventEmitter {
   }
 
   private setupCommandChannel(channel: RTCDataChannel) {
-    this.commandChannel = new PeeringCommandChannel(channel)
-    this.commandChannel.onMessage((message) => {
+    const commandChannel = new PeeringCommandChannel(channel)
+    commandChannel.onMessage((message) => {
       this.emit(this.onMessage, message)
     })
-    this.commandChannel.onFileReceived((file) => {
+    commandChannel.onFileReceived((file) => {
       this.filesReceived.push(file)
       this.emit(this.onFileReceived, file)
     })
-
-    this.logger.debug("Command channel ready", this.commandChannel.id)
-    this.state = PeeringState.Open
+    commandChannel.onClose(() => {
+      this.logger.warn("Command channel closed!", commandChannel.id)
+      this.state = PeeringState.Disconnected
+    })
+    commandChannel.onOpen(() => {
+      this.logger.debug("Command channel ready", commandChannel.id)
+      this.state = PeeringState.Open
+    })
+    this.commandChannel = commandChannel
   }
 
-  private addTransferChannel(channel: AbstractPeeringFileChannel) {
-    channel.onError(this.handleChannelError)
+  private setupTransferChannel(channel: AbstractPeeringFileChannel) {
     channel.onClose(this.handleChannelClose)
     channel.onDataError(this.handleChannelDataError)
+    channel.onError(this.handleChannelError)
     this.transferChannels.push(channel)
   }
 
   private removeTransferChannel(channel: AbstractPeeringFileChannel) {
-    this.cleanupChannel(channel)
+    channel.destroy()
     this.transferChannels.splice(this.transferChannels.indexOf(channel), 1)
-  }
-
-  private cleanupChannel(channel: AbstractPeeringFileChannel) {
-    channel.removeListener(this.handleChannelClose)
-    channel.removeListener(this.handleChannelError)
-    channel.removeListener(this.handleChannelDataError)
   }
 
   private handleDataChannel = (ev: RTCDataChannelEvent) => {
@@ -181,60 +155,44 @@ export class PeeringClient extends EventEmitter {
     if (!this.commandChannel) {
       this.setupCommandChannel(ev.channel)
     } else {
-      const transferChannel = new PeeringFileUploadChannel(
+      const uploadChannel = new PeeringFileUploadChannel(
         ev.channel,
         this.filesOffered
       )
-      this.addTransferChannel(transferChannel)
+      uploadChannel.onUploadStarted((file) => {
+        this.emit(this.onFileUpdated, file)
+      })
+      this.setupTransferChannel(uploadChannel)
     }
   }
+
   private handleConnectionStateChange = (ev: Event) => {
     this.logger.debug("connection-state-changed", ev)
     if (this.connection.connectionState === "closed") {
       this.state = PeeringState.Disconnected
     }
   }
-  private handleTrack = (ev: RTCTrackEvent) => {
-    this.logger.debug("track", ev)
-  }
 
   private handleChannelClose = (
     channel: AbstractPeeringFileChannel,
     ev: Event
   ) => {
-    if (this.commandChannel?.id === channel.id) {
-      this.logger.error("Command channel closed!", ev)
-      this.state = PeeringState.Disconnected
-    } else {
-      this.logger.debug("Transfer channel closed.", channel.id, channel.label)
-      this.removeTransferChannel(channel)
-    }
-  }
-  private handleChannelError = (
-    channel: AbstractPeeringFileChannel,
-    ev: Event
-  ) => {
-    this.logger.warn("channel-error", channel.id, channel.label, ev)
+    this.logger.debug("Transfer channel closed.", channel.label, ev)
+    this.removeTransferChannel(channel)
   }
 
   private handleChannelDataError = (
     channel: AbstractPeeringFileChannel,
     error: Error
   ) => {
-    this.logger.warn("channel-data-error", channel.id, channel.label, error)
+    this.logger.warn("Transfer channel data error", channel.label, error)
+    toast.error("Error: " + error.message)
   }
 
-  private saveFile(receivedFile: IFileReceived) {
-    if (!receivedFile.blob) return
-
-    // Download file to client
-    const file = new File([receivedFile.blob], receivedFile.metadata.name, {
-      type: receivedFile.metadata.type,
-    })
-    const downloadUrl = URL.createObjectURL(file)
-    const a = document.createElement("a")
-    a.href = downloadUrl
-    a.download = file.name
-    a.click()
+  private handleChannelError = (
+    channel: AbstractPeeringFileChannel,
+    ev: Event
+  ) => {
+    this.logger.warn("Transfer channel error", channel.label, ev)
   }
 }
