@@ -9,7 +9,10 @@
   --radius: 10px;
 }
 
-body {
+html,
+body,
+#root {
+  height: 100%;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 15px;
 }
@@ -27,4 +30,5 @@ body {
   padding: 15px;
   max-width: 500px;
   margin: 0 auto;
+  height: 100%;
 }

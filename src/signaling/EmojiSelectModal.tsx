@@ -1,9 +1,9 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 import { FormEvent, useEffect, useMemo, useState } from "react"
+import { InputForm } from "../components/InputForm"
+import { Modal } from "../components/Modal"
 import { RandomGenerator } from "../helpers/RandomGenerator"
 import cl from "./EmojiSelectModal.module.css"
-import { InputForm } from "./InputForm"
-import { Modal } from "./Modal"
 
 interface IProps {
   initialValue: string

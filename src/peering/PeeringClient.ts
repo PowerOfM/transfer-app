@@ -59,7 +59,6 @@ export class PeeringClient extends EventEmitter {
   }
 
   public destroy() {
-    this.removeListener()
     this.connection.close()
     this.connection.removeEventListener("datachannel", this.handleDataChannel)
     this.connection.removeEventListener(
@@ -73,6 +72,7 @@ export class PeeringClient extends EventEmitter {
     this.transferChannels.forEach((channel) => channel.destroy())
 
     this.state = PeeringState.Disconnected
+    this.removeListener()
   }
 
   public sendMessage(message: string): void {
@@ -168,7 +168,10 @@ export class PeeringClient extends EventEmitter {
 
   private handleConnectionStateChange = (ev: Event) => {
     this.logger.debug("connection-state-changed", ev)
-    if (this.connection.connectionState === "closed") {
+    if (
+      this.connection.connectionState === "closed" ||
+      this.connection.connectionState === "failed"
+    ) {
       this.state = PeeringState.Disconnected
     }
   }

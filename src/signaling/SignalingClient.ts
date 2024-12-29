@@ -16,9 +16,14 @@ const BROADCAST_TYPES = [
   BroadcastType.Leave,
 ]
 
+export enum DeviceType {
+  Mobile = "mobile",
+  Desktop = "desktop",
+}
+
 type BroadcastPacket =
-  | [BroadcastType.Hello, string, string]
-  | [BroadcastType.Welcome, string, string]
+  | [BroadcastType.Hello, string, string, DeviceType, number]
+  | [BroadcastType.Welcome, string, string, DeviceType, number]
   | [BroadcastType.Leave, string]
 
 export enum SignalingType {
@@ -50,6 +55,7 @@ type SignalingPacket =
 export interface ISignalingPeer {
   id: string
   name: string
+  deviceType: DeviceType
   ts: number
 }
 
@@ -80,6 +86,11 @@ export class SignalingClient extends EventEmitter {
   private peers: ISignalingPeer[] = []
   private name: string = RandomGenerator.name()
 
+  private joinTs: number = Date.now()
+  private deviceType: DeviceType = window.navigator.userAgent.includes("Mobile")
+    ? DeviceType.Mobile
+    : DeviceType.Desktop
+
   private currentRoomKey: string | undefined
 
   private updatePeersTimer: number = 0
@@ -104,7 +115,7 @@ export class SignalingClient extends EventEmitter {
     window.clearInterval(this.disconnectTimer)
 
     if (graceful && this.currentRoomKey) {
-      await this.send([BroadcastType.Leave, this.client.id, this.name])
+      await this.send([BroadcastType.Leave, this.client.id])
     }
 
     await this.client.destroy()
@@ -146,7 +157,7 @@ export class SignalingClient extends EventEmitter {
 
   public async leaveRoom() {
     this.currentRoomKey = undefined
-    await this.send([BroadcastType.Leave, this.client.id, this.name])
+    await this.send([BroadcastType.Leave, this.client.id])
     await this.client.leaveRoom()
   }
 
@@ -154,14 +165,26 @@ export class SignalingClient extends EventEmitter {
    * Broadcast greeting to the channel
    */
   public async sendHello() {
-    return this.send([BroadcastType.Hello, this.client.id, this.name])
+    return this.send([
+      BroadcastType.Hello,
+      this.client.id,
+      this.name,
+      this.deviceType,
+      this.joinTs,
+    ])
   }
 
   /**
    * Broadcast response to "Hello" to channel (or updated name)
    */
   public async sendWelcome() {
-    this.send([BroadcastType.Welcome, this.client.id, this.name])
+    this.send([
+      BroadcastType.Welcome,
+      this.client.id,
+      this.name,
+      this.deviceType,
+      this.joinTs,
+    ])
   }
 
   /**
@@ -172,10 +195,10 @@ export class SignalingClient extends EventEmitter {
     type: SignalingPacket[0],
     data: SignalingPacket[1]
   ) {
-    this.send([type, data], to)
+    this.send([type, data] as SignalingPacket, to)
   }
 
-  private async send(data: unknown, to?: string) {
+  private async send(data: BroadcastPacket | SignalingPacket, to?: string) {
     const jsonStr = JSON.stringify(data)
     await this.client.send(jsonStr, to)
   }
@@ -220,7 +243,7 @@ export class SignalingClient extends EventEmitter {
   }
 
   private handleBroadcast = (data: string) => {
-    const [type, id, name] = JSON.parse(data) as BroadcastPacket
+    const [type, id, name, deviceType, ts] = JSON.parse(data) as BroadcastPacket
 
     // Validate
     if (!BROADCAST_TYPES.includes(type)) {
@@ -231,11 +254,21 @@ export class SignalingClient extends EventEmitter {
       this.logger.error("Invalid peer", { type, id, name })
       return
     }
+    if (!deviceType || !Object.values(DeviceType).includes(deviceType)) {
+      this.logger.error("Invalid device type", deviceType)
+      return
+    }
 
     // Respond to "Hello" messages with a warm welcome
     if (type === BroadcastType.Hello) this.sendWelcome()
 
-    this.updatePeer(id, name, type === BroadcastType.Leave)
+    this.updatePeer(
+      id,
+      name,
+      deviceType,
+      Number(ts) || Date.now(),
+      type === BroadcastType.Leave
+    )
     this.emit(this.onPeers, this.peers)
   }
 
@@ -273,7 +306,13 @@ export class SignalingClient extends EventEmitter {
     }
   }
 
-  private updatePeer(id: string, name: string, hasLeft: boolean) {
+  private updatePeer(
+    id: string,
+    name: string,
+    deviceType: DeviceType,
+    ts: number,
+    hasLeft: boolean
+  ) {
     const existingIndex = this.peers.findIndex((entry) => entry.id === id)
     if (hasLeft) {
       if (existingIndex >= 0) {
@@ -282,11 +321,12 @@ export class SignalingClient extends EventEmitter {
     } else {
       if (existingIndex >= 0) {
         this.peers[existingIndex].name = name
-        this.peers[existingIndex].ts = Date.now()
+        this.peers[existingIndex].ts = ts
       } else {
-        this.peers.push({ id, name, ts: Date.now() })
+        this.peers.push({ id, name, deviceType, ts })
       }
     }
+    this.peers.sort((a, b) => a.ts - b.ts)
   }
 
   private updatePeersList() {

@@ -1,16 +1,17 @@
-import clsx from "clsx"
 import { useEffect, useState } from "react"
 import { Badge } from "../components/Badge"
 import { Button } from "../components/Button"
 import { ConnectionPage } from "../components/ConnectionPage"
-import { EmojiSelectModal } from "../components/EmojiSelectModal"
 import { DiscoverIPHelper } from "../helpers/DiscoverIPHelper"
 import { RandomGenerator } from "../helpers/RandomGenerator"
 import { useAsync } from "../helpers/useAsync"
 import { useLocalStorage } from "../helpers/useLocalStorage"
 import { IPeerConnection } from "../sharedTypes"
+import { EmojiSelectModal } from "./EmojiSelectModal"
+import { RoomModal } from "./RoomModal"
 import { ISignalingPeer } from "./SignalingClient"
 import cl from "./SignalingPage.module.css"
+import { SignalingPeerItem } from "./SignalingPeerItem"
 import { useSignalingClient } from "./useSignalingClient"
 
 interface IProps {
@@ -19,7 +20,7 @@ interface IProps {
 
 export const SignalingPage = ({ onReady }: IProps) => {
   const [ipResult, ipLoading] = useAsync(() => DiscoverIPHelper.getIp())
-  const [autoDiscoveryEnabled, setAutoDiscoveryEnabled] = useState(false)
+  const [roomModalOpen, setRoomModalOpen] = useState(false)
 
   const [roomId, setRoomId] = useState<string | null>(null)
   const [emoji, setEmoji] = useLocalStorage("emoji", RandomGenerator.emoji())
@@ -32,10 +33,8 @@ export const SignalingPage = ({ onReady }: IProps) => {
 
     if (ipResult) {
       setRoomId(ipResult)
-      setAutoDiscoveryEnabled(true)
     } else {
-      setRoomId((prev) => prev ?? crypto.randomUUID())
-      setAutoDiscoveryEnabled(false)
+      setRoomId((prev) => prev ?? crypto.randomUUID().slice(0, 8).toUpperCase())
     }
   }, [ipResult, ipLoading])
 
@@ -61,12 +60,16 @@ export const SignalingPage = ({ onReady }: IProps) => {
       </div>
 
       <div className={cl.inputs}>
-        <Button className={cl.discovery}>
-          {ipLoading
-            ? "Loading..."
-            : autoDiscoveryEnabled
-            ? "Local Network Discovery"
-            : "Manual Connection"}
+        <Button className={cl.discovery} onClick={() => setRoomModalOpen(true)}>
+          {ipLoading ? (
+            "Loading..."
+          ) : roomId === ipResult ? (
+            "Local Network Discovery"
+          ) : (
+            <>
+              Key: <span className={cl.roomId}>{roomId}</span>
+            </>
+          )}
         </Button>
 
         <Button className={cl.emoji} onClick={() => setEmojiModalOpen(true)}>
@@ -74,22 +77,14 @@ export const SignalingPage = ({ onReady }: IProps) => {
         </Button>
       </div>
 
-      {client.peers.map((peer) => {
-        const isYou = peer.id === client.id
-        return (
-          <div
-            key={peer.id}
-            className={clsx(cl.peer, isYou && cl.disabled)}
-            onClick={() => !isYou && handlePeerClick(peer)}
-          >
-            <div
-              className={cl.dot}
-              style={{ backgroundColor: peer.name.split("-")[0] }}
-            />
-            {peer.name} {isYou && "(you)"}
-          </div>
-        )
-      })}
+      {client.peers.map((peer) => (
+        <SignalingPeerItem
+          key={peer.id}
+          peer={peer}
+          clientId={client.id ?? ""}
+          onClick={handlePeerClick}
+        />
+      ))}
 
       <EmojiSelectModal
         initialValue={emoji}
@@ -100,6 +95,14 @@ export const SignalingPage = ({ onReady }: IProps) => {
           }
           setEmojiModalOpen(false)
         }}
+      />
+
+      <RoomModal
+        open={roomModalOpen}
+        ipResult={ipResult}
+        roomId={roomId}
+        onClose={() => setRoomModalOpen(false)}
+        onRoomKey={setRoomId}
       />
     </div>
   )

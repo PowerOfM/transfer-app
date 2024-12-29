@@ -8,14 +8,16 @@ export class RandomGenerator {
     uniqueNamesGenerator({
       dictionaries: [webColors, animals],
       style: "capital",
-      separator: "-",
+      separator: " ",
     })
 
   public static color = () =>
     webColors[Math.floor(Math.random() * webColors.length)]
 
-  public static emoji = () =>
-    emojisList.emojis[Math.floor(Math.random() * emojisList.emojis.length)]
+  public static emoji = () => {
+    const list = this.emojiList()
+    return list[Math.floor(Math.random() * list.length)]
+  }
 
   public static emojiList = () =>
     this.shuffleArray(emojisList.emojis).slice(0, 30)
@@ -24,8 +26,8 @@ export class RandomGenerator {
     const rng = seedRandom(this.buildLocalTimeSeed())
     const shuffled = [...array]
     for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+      const j = Math.floor(rng() * (i + 1))
+      ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
     }
     return shuffled
   }
