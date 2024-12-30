@@ -1,10 +1,11 @@
 import { EventEmitter } from "typed-event-emitter"
+import stunServers from "../assets/stunServers.json"
 import { Logger } from "../helpers/Logger"
 import { IPeerConnection } from "../sharedTypes"
 import { SignalingClient, SignalingType } from "./SignalingClient"
 
 const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: "stun:stun.1.google.com:19302" }],
+  iceServers: stunServers.map((server) => ({ urls: `stun:${server}` })),
 }
 
 /**
