@@ -1,15 +1,17 @@
 import mqtt from "mqtt"
 import { EventEmitter } from "typed-event-emitter"
+import mqttBrokers from "../assets/mqttBrokers.json"
 import { DataEncrypter } from "../helpers/DataEncrypter"
 import { hash } from "../helpers/hash"
 import { Logger } from "../helpers/Logger"
 
 const VERBOSE = false
 
-const DEV_MODE = window.location.hostname === "localhost"
-const DEFAULT_BROKER = DEV_MODE
-  ? "ws://localhost:8883"
-  : "wss://broker.hivemq.com:8884/mqtt"
+// LOCAL: ws://localhost:8883
+
+export const MQTT_BROKER_STORAGE_KEY = "mqtt-broker"
+export const DEFAULT_MQTT_BROKER =
+  localStorage.getItem(MQTT_BROKER_STORAGE_KEY) || mqttBrokers[0]
 const CHANNEL_NAME_PREFIX = "ARDP"
 
 const ID_STORAGE_KEY = "mqtt-client-id"
@@ -41,13 +43,13 @@ export class EncryptedMQTTClient extends EventEmitter {
     return this._status
   }
 
-  public static async build(brokerUrl = DEFAULT_BROKER) {
+  public static async build(brokerUrl = DEFAULT_MQTT_BROKER) {
     const client = new EncryptedMQTTClient(brokerUrl)
     await client.waitForConnection()
     return client
   }
 
-  constructor(public readonly brokerUrl = DEFAULT_BROKER) {
+  constructor(public readonly brokerUrl = DEFAULT_MQTT_BROKER) {
     super()
 
     this.logger.debug("Connecting to broker", brokerUrl)

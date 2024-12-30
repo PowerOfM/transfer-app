@@ -1,0 +1,14 @@
+.label {
+  margin-top: 20px;
+}
+
+.brokersList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  button {
+    color: var(--black);
+    background-color: var(--grey);
+  }
+}

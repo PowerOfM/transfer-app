@@ -1,5 +1,6 @@
 import clsx from "clsx"
 import { Badge } from "./Badge"
+import { Button } from "./Button"
 import { ConnectionArrow } from "./ConnectionArrow"
 import cl from "./ConnectionPage.module.css"
 
@@ -12,5 +13,9 @@ export const ConnectionPage = ({ message }: { message: string }) => (
     </div>
 
     <div className={cl.info}>{message}</div>
+
+    <Button small onClick={() => window.location.reload()}>
+      Cancel
+    </Button>
   </div>
 )

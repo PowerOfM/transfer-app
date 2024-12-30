@@ -40,4 +40,9 @@
       left: 10px;
     }
   }
+
+  &.small {
+    height: 30px;
+    padding: 5px 10px;
+  }
 }

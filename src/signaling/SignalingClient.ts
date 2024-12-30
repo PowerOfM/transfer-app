@@ -135,8 +135,11 @@ export class SignalingClient extends EventEmitter {
     return this.peers
   }
 
-  public async connect() {
-    this.client = await EncryptedMQTTClient.build()
+  public async connect(mqttBroker?: string) {
+    if (this.client) {
+      await this.client.destroy()
+    }
+    this.client = await EncryptedMQTTClient.build(mqttBroker)
     this.setupClient()
   }
 

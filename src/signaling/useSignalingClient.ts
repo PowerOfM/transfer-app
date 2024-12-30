@@ -22,23 +22,21 @@ const logger = new Logger("useSignalingClient")
  * @param onReady - Callback function to call when the client is ready.
  */
 export function useSignalingClient(
+  mqttBroker: string | null,
   roomId: string | null,
   emoji: string,
   onReady: (result: IPeerConnection) => void
 ) {
   const clientRef = useRef<SignalingClient>()
-  useEffect(() => {
-    clientRef.current = new SignalingClient()
-  }, [])
+  const refActivePeerId = useRef<string | null>(null)
+  const refSignalingTimeout = useRef<number | null>(null)
 
   const [state, setState] = useState<SignalingState>("loading")
   const [error, setError] = useState<Error | null>(null)
   const [peers, setPeers] = useState<ISignalingPeer[]>([])
 
-  const refActivePeerId = useRef<string | null>(null)
-  const refSignalingTimeout = useRef<number | null>(null)
-
   useEffect(() => {
+    clientRef.current = clientRef.current ?? new SignalingClient()
     const listeners: Listener[] = []
 
     async function run() {
@@ -47,18 +45,31 @@ export function useSignalingClient(
 
       const handleNegotiation = (peerId: string, isInitiator: boolean) => {
         setState("negotiating")
-        NegotiationClient.negotiate(peerId, client, isInitiator)
-          .then((result) => {
-            client.destroy()
-            onReady(result)
-          })
-          .catch((error) => {
-            logger.error("Error negotiating", error)
-            setState("ready")
-            toast.error(
-              "Couldn't negotiate with the other device. Check the console for more details."
-            )
-          })
+        const negotiator = new NegotiationClient(peerId, client, isInitiator)
+
+        negotiator.onConnected((connection) => {
+          negotiator.cleanup()
+          client.destroy()
+          onReady({ connection, isInitiator })
+        })
+        negotiator.onError((error) => {
+          negotiator.cleanup()
+          logger.error("Error negotiating", error)
+          setState("ready")
+          toast.error(
+            "Couldn't negotiate with the other device. Check the console for more details."
+          )
+        })
+
+        if (refSignalingTimeout.current) {
+          clearTimeout(refSignalingTimeout.current)
+        }
+
+        refSignalingTimeout.current = window.setTimeout(() => {
+          negotiator.cleanup()
+          toast.error("Timed out waiting for negotiation to complete.")
+          setState("ready")
+        }, SIGNALING_TIMEOUT)
       }
 
       setPeers([...client.getPeers()])
@@ -132,6 +143,24 @@ export function useSignalingClient(
       }
     }
   }, [onReady])
+
+  useEffect(() => {
+    const client = clientRef.current
+    if (!client || !mqttBroker) return
+
+    client
+      .connect(mqttBroker)
+      .then(() => {
+        if (roomId) client.setRoom(roomId, emoji)
+      })
+      .catch((error) => {
+        logger.error("Error connecting to MQTT broker", error)
+        toast.error(
+          "Couldn't connect to the MQTT broker. Check the console for more details."
+        )
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mqttBroker])
 
   useEffect(() => {
     const client = clientRef.current
